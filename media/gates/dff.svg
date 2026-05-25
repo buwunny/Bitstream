@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 80"
+     fill="none" stroke="currentColor" stroke-width="2"
+     stroke-linecap="round" stroke-linejoin="round" style="color:#4b5563">
+  <title>D Flip-Flop</title>
+  <!-- Box -->
+  <rect x="18" y="5" width="64" height="70" rx="3"/>
+  <!-- D port label -->
+  <text x="24" y="26" font-family="ui-monospace,monospace" font-size="12"
+        fill="currentColor" stroke="none">D</text>
+  <!-- Q port label -->
+  <text x="76" y="44" font-family="ui-monospace,monospace" font-size="12"
+        fill="currentColor" stroke="none" text-anchor="end">Q</text>
+  <!-- Rising-edge clock marker (chevron inside box at CLK port) -->
+  <polyline points="18,56 27,63 18,70" stroke-width="2"/>
+  <!-- D input stub -->
+  <line x1="0"  y1="22" x2="18" y2="22"/>
+  <!-- CLK input stub -->
+  <line x1="0"  y1="63" x2="18" y2="63"/>
+  <!-- Q output stub -->
+  <line x1="82" y1="40" x2="100" y2="40"/>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 80"
+     fill="none" stroke="currentColor" stroke-width="2.5"
+     stroke-linecap="round" stroke-linejoin="round" style="color:#4b5563">
+  <title>Input Port</title>
+  <!-- Right-pointing pentagon — signal flows right into the circuit -->
+  <path d="M 5,14 L 5,66 L 70,66 L 93,40 L 70,14 Z"/>
+  <!-- Output stub -->
+  <line x1="93" y1="40" x2="100" y2="40"/>
+</svg>

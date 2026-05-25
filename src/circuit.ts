@@ -103,8 +103,11 @@ export class CircuitEditor {
     private currentPath: vscode.Uri | undefined;
     private readonly disposables: vscode.Disposable[] = [];
 
-    private constructor(panel: vscode.WebviewPanel, _extensionUri: vscode.Uri) {
+    private readonly extensionUri: vscode.Uri;
+
+    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
         this.panel = panel;
+        this.extensionUri = extensionUri;
         this.panel.webview.html = this.renderHtml();
         this.panel.webview.onDidReceiveMessage(
             (msg) => this.handleMessage(msg).catch((err) => {
@@ -269,6 +272,14 @@ export class CircuitEditor {
     // ----- HTML --------------------------------------------------------------
 
     private renderHtml(): string {
+        const gateNames = ["and", "or", "xor", "nand", "nor", "xnor", "not", "buf", "dff", "input", "output"] as const;
+        const gateUris: Record<string, string> = {};
+        for (const name of gateNames) {
+            const uri = this.panel.webview.asWebviewUri(
+                vscode.Uri.joinPath(this.extensionUri, "media", "gates", `${name}.svg`)
+            );
+            gateUris[name.toUpperCase()] = uri.toString();
+        }
         const nonce = randomNonce();
         const csp = [
             `default-src 'none'`,
@@ -306,9 +317,12 @@ export class CircuitEditor {
   }
   svg.canvas.panning { cursor: grabbing; }
   svg.canvas.spacing  { cursor: grab; }
-  .node rect { fill: var(--vscode-editorWidget-background); stroke: var(--vscode-panel-border); stroke-width: 1.2; }
-  .node.selected rect { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+  .node rect:not(.hit) { fill: var(--vscode-editorWidget-background); stroke: var(--vscode-panel-border); stroke-width: 1.2; }
+  .node.selected rect:not(.hit) { stroke: var(--vscode-focusBorder); stroke-width: 2; }
   .node.module rect { fill: var(--vscode-textBlockQuote-background, var(--vscode-editorWidget-background)); }
+  .node .hit { fill: transparent; stroke: none; }
+  .node.selected .hit { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+  body.vscode-dark image, body.vscode-high-contrast image { filter: invert(1); }
   .node text.label { fill: var(--vscode-foreground); font-family: var(--vscode-editor-font-family, monospace); font-size: 12px; text-anchor: middle; pointer-events: none; }
   .node text.type  { fill: var(--vscode-descriptionForeground); font-size: 9px; text-anchor: middle; pointer-events: none; }
   .node text.pin-label { fill: var(--vscode-descriptionForeground); font-size: 9px; pointer-events: none; }
@@ -376,7 +390,7 @@ export class CircuitEditor {
   </div>
 </div>
 
-<script nonce="${nonce}">
+<script nonce="${nonce}">const GATE_URIS = ${JSON.stringify(gateUris)};
 ${WEBVIEW_SCRIPT}
 </script>
 </body>
@@ -584,18 +598,20 @@ const WEBVIEW_SCRIPT = `
 const vscode = acquireVsCodeApi();
 
 // ----- Component descriptors -----------------------------------------------
+// Pin y-coords are computed from the SVG stub positions (viewBox 0 0 100 80)
+// scaled to each node's h: y_node = y_svg * h / 80.
 const FIXED_SHAPES = {
-  INPUT:  { w: 60, h: 32, ins: [],                                            outs: [{ y: 16 }] },
-  OUTPUT: { w: 60, h: 32, ins: [{ y: 16 }],                                   outs: [] },
-  AND:    { w: 70, h: 50, ins: [{ y: 14 }, { y: 36 }],                        outs: [{ y: 25 }] },
-  OR:     { w: 70, h: 50, ins: [{ y: 14 }, { y: 36 }],                        outs: [{ y: 25 }] },
-  XOR:    { w: 70, h: 50, ins: [{ y: 14 }, { y: 36 }],                        outs: [{ y: 25 }] },
-  NAND:   { w: 70, h: 50, ins: [{ y: 14 }, { y: 36 }],                        outs: [{ y: 25 }] },
-  NOR:    { w: 70, h: 50, ins: [{ y: 14 }, { y: 36 }],                        outs: [{ y: 25 }] },
-  XNOR:   { w: 70, h: 50, ins: [{ y: 14 }, { y: 36 }],                        outs: [{ y: 25 }] },
-  NOT:    { w: 60, h: 40, ins: [{ y: 20 }],                                   outs: [{ y: 20 }] },
-  BUF:    { w: 60, h: 40, ins: [{ y: 20 }],                                   outs: [{ y: 20 }] },
-  DFF:    { w: 80, h: 60, ins: [{ y: 18, lbl: 'D' }, { y: 42, lbl: 'CLK' }],  outs: [{ y: 30, lbl: 'Q' }] },
+  INPUT:  { w: 60, h: 32, ins: [],                                              outs: [{ y: 16 }] },
+  OUTPUT: { w: 60, h: 32, ins: [{ y: 16 }],                                     outs: [] },
+  AND:    { w: 70, h: 50, ins: [{ y: 16 }, { y: 34 }],                          outs: [{ y: 25 }] },
+  OR:     { w: 70, h: 50, ins: [{ y: 16 }, { y: 34 }],                          outs: [{ y: 25 }] },
+  XOR:    { w: 70, h: 50, ins: [{ y: 16 }, { y: 34 }],                          outs: [{ y: 25 }] },
+  NAND:   { w: 70, h: 50, ins: [{ y: 16 }, { y: 34 }],                          outs: [{ y: 25 }] },
+  NOR:    { w: 70, h: 50, ins: [{ y: 16 }, { y: 34 }],                          outs: [{ y: 25 }] },
+  XNOR:   { w: 70, h: 50, ins: [{ y: 16 }, { y: 34 }],                          outs: [{ y: 25 }] },
+  NOT:    { w: 60, h: 40, ins: [{ y: 20 }],                                     outs: [{ y: 20 }] },
+  BUF:    { w: 60, h: 40, ins: [{ y: 20 }],                                     outs: [{ y: 20 }] },
+  DFF:    { w: 80, h: 60, ins: [{ y: 17, lbl: 'D' }, { y: 47, lbl: 'CLK' }],   outs: [{ y: 30, lbl: 'Q' }] },
 };
 
 /**
@@ -829,21 +845,35 @@ function bezier(a, b) {
 function renderNode(n, lod) {
   const s = shapeOf(n);
   const isModule = n.type === 'MODULE';
+  const gateUri = !isModule && GATE_URIS[n.type];
   const g = svgEl('g', {
     class: 'node' + (selectedNodes.has(n.id) ? ' selected' : '') + (isModule ? ' module' : ''),
     transform: 'translate(' + n.x + ',' + n.y + ')',
   });
-  g.appendChild(svgEl('rect', { x: 0, y: 0, width: s.w, height: s.h, rx: 4, ry: 4 }));
 
-  // 'low': outlines only. Still attach interaction so users can pan and
-  // double-click drill-down without zooming in first.
+  if (gateUri) {
+    // SVG icon fills the node bounds; stubs in the SVG reach x=0 (left) and
+    // x=100→s.w (right), so wire endpoints land exactly on the pin circles.
+    g.appendChild(svgEl('image', { href: gateUri, x: 0, y: 0, width: s.w, height: s.h, preserveAspectRatio: 'none' }));
+    // Transparent rect provides the selection stroke and a reliable hit target.
+    g.appendChild(svgEl('rect', { class: 'hit', x: 0, y: 0, width: s.w, height: s.h, rx: 3, ry: 3 }));
+  } else {
+    g.appendChild(svgEl('rect', { x: 0, y: 0, width: s.w, height: s.h, rx: 4, ry: 4 }));
+  }
+
   if (lod !== 'low') {
-    const labelEl = svgEl('text', { class: 'label', x: s.w / 2, y: isModule ? 14 : s.h / 2 + 4 });
+    // For gate icons the type is conveyed visually; show the instance label
+    // below the symbol. For I/O and MODULE keep it inside the box.
+    const isIO = n.type === 'INPUT' || n.type === 'OUTPUT';
+    const labelY = gateUri && !isIO ? s.h + 12 : (isModule ? 14 : s.h / 2 + 4);
+    const labelEl = svgEl('text', { class: 'label', x: s.w / 2, y: labelY });
     labelEl.textContent = n.label;
     g.appendChild(labelEl);
-    const typeEl = svgEl('text', { class: 'type', x: s.w / 2, y: s.h - 4 });
-    typeEl.textContent = isModule ? n.moduleRef : n.type;
-    g.appendChild(typeEl);
+    if (isModule) {
+      const typeEl = svgEl('text', { class: 'type', x: s.w / 2, y: s.h - 4 });
+      typeEl.textContent = n.moduleRef;
+      g.appendChild(typeEl);
+    }
   }
 
   // Pins are always rendered so wiring remains possible at any zoom. Pin

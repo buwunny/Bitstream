@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 80"
+     fill="none" stroke="currentColor" stroke-width="2.5"
+     stroke-linecap="round" stroke-linejoin="round" style="color:#4b5563">
+  <title>XOR Gate</title>
+  <!-- Body: same shape as OR gate -->
+  <path d="M 15,12 C 42,12 72,25 72,40 C 72,55 42,68 15,68 Q 30,40 15,12 Z"/>
+  <!-- Extra arc on left (XOR distinguishing mark) -->
+  <path d="M 8,12 Q 23,40 8,68"/>
+  <!-- Input stubs -->
+  <line x1="0"  y1="26" x2="21" y2="26"/>
+  <line x1="0"  y1="54" x2="21" y2="54"/>
+  <!-- Output stub -->
+  <line x1="72" y1="40" x2="100" y2="40"/>
+</svg>

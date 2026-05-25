@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 80"
+     fill="none" stroke="currentColor" stroke-width="2.5"
+     stroke-linecap="round" stroke-linejoin="round" style="color:#4b5563">
+  <title>AND Gate</title>
+  <!-- Body: flat left side, D-curve right cap -->
+  <path d="M 20,12 L 20,68 C 50,68 75,56 75,40 C 75,24 50,12 20,12 Z"/>
+  <!-- Input stubs -->
+  <line x1="0"  y1="26" x2="20" y2="26"/>
+  <line x1="0"  y1="54" x2="20" y2="54"/>
+  <!-- Output stub -->
+  <line x1="75" y1="40" x2="100" y2="40"/>
+</svg>
