@@ -29,52 +29,79 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
+import { parseVerilogText, parseVhdlText, ModuleDecl } from "./hierarchy";
 
 type PinSide = "in" | "out";
 
 export type NodeType =
-    | "INPUT" | "OUTPUT"
-    | "AND" | "OR" | "XOR" | "NAND" | "NOR" | "XNOR"
-    | "NOT" | "BUF"
-    | "DFF"
-    | "MODULE";
+  | "INPUT" | "OUTPUT"
+  | "AND" | "OR" | "XOR" | "NAND" | "NOR" | "XNOR"
+  | "NOT" | "BUF"
+  | "DFF"
+  | "MODULE";
 
 export interface ModulePort { label: string; width: number; }
+
+/** HDL flavour for imports and exports. */
+export type HdlLanguage = "verilog" | "systemverilog" | "vhdl";
+
 export interface ModuleInterface {
-    ins:  ModulePort[];
-    outs: ModulePort[];
-    /** Relative path the module was imported from — kept for drill-down and reload. */
-    file?: string;
-    /**
-     * Full body of the referenced design. We snapshot it at import time so the
-     * file is self-contained: Verilog export can emit the whole hierarchy
-     * without re-reading anything from disk, and offline editing keeps
-     * working. A separate "Reload Modules" action picks up external changes.
-     */
-    body?: CircuitDoc;
+  ins: ModulePort[];
+  outs: ModulePort[];
+  /** Relative path the module was imported from — kept for drill-down and reload. */
+  file?: string;
+  /**
+   * Full body of the referenced design. We snapshot it at import time so the
+   * file is self-contained: Verilog export can emit the whole hierarchy
+   * without re-reading anything from disk, and offline editing keeps
+   * working. A separate "Reload Modules" action picks up external changes.
+   */
+  body?: CircuitDoc;
+  /**
+   * Raw HDL source for imported leaf modules. When set the module is a leaf
+   * — export emits this text verbatim instead of synthesising from `body`.
+   * `language` tags the source flavour so cross-language exports can decide
+   * to inline (matching language) or skip (mismatched) on a per-import basis.
+   */
+  hdlSource?: string;
+  language?: HdlLanguage;
 }
 
 export interface CircuitNode {
-    id: string;
-    type: NodeType;
-    x: number;
-    y: number;
-    label: string;
-    /** Present when type === "MODULE" — key into doc.modules. */
-    moduleRef?: string;
+  id: string;
+  type: NodeType;
+  x: number;
+  y: number;
+  label: string;
+  /** Present when type === "MODULE" — key into doc.modules. */
+  moduleRef?: string;
+  /** Optional CSS color string overriding the default node fill/outline. */
+  color?: string;
 }
 
 export interface CircuitWire {
-    from: { id: string; pin: number; side: PinSide };
-    to:   { id: string; pin: number; side: PinSide };
+  from: { id: string; pin: number; side: PinSide };
+  to: { id: string; pin: number; side: PinSide };
+  /** Optional CSS color string overriding the default wire stroke. */
+  color?: string;
+  /**
+   * Intermediate routing points for straight-wire layout. Each point is in
+   * content-space coordinates and becomes a vertex in the polyline drawn
+   * from `from` through the waypoints to `to`. Ignored in curved mode.
+   */
+  waypoints?: Array<{ x: number; y: number }>;
 }
 
+export type RoutingStyle = "curved" | "straight";
+
 export interface CircuitDoc {
-    moduleName: string;
-    nodes: CircuitNode[];
-    wires: CircuitWire[];
-    /** Hierarchical module library kept inline so the file is self-contained. */
-    modules?: Record<string, ModuleInterface>;
+  moduleName: string;
+  nodes: CircuitNode[];
+  wires: CircuitWire[];
+  /** Hierarchical module library kept inline so the file is self-contained. */
+  modules?: Record<string, ModuleInterface>;
+  /** Wire rendering mode. Defaults to "curved" when absent. */
+  routingStyle?: RoutingStyle;
 }
 
 const FILE_EXT = ".bscircuit.json";
@@ -84,210 +111,306 @@ const FILE_EXT = ".bscircuit.json";
 // ---------------------------------------------------------------------------
 
 export class CircuitEditor {
-    public static readonly viewType = "bitstream.circuit";
-    private static instances: CircuitEditor[] = [];
+  public static readonly viewType = "bitstream.circuit";
+  private static instances: CircuitEditor[] = [];
 
-    public static show(extensionUri: vscode.Uri, openFile?: vscode.Uri): void {
-        const panel = vscode.window.createWebviewPanel(
-            CircuitEditor.viewType,
-            "Circuit Editor",
-            vscode.ViewColumn.Active,
-            { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [extensionUri] },
-        );
-        const editor = new CircuitEditor(panel, extensionUri);
-        CircuitEditor.instances.push(editor);
-        if (openFile) { editor.loadFromDisk(openFile); }
+  public static show(extensionUri: vscode.Uri, openFile?: vscode.Uri): void {
+    const panel = vscode.window.createWebviewPanel(
+      CircuitEditor.viewType,
+      "Circuit Editor",
+      vscode.ViewColumn.Active,
+      { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [extensionUri] },
+    );
+    const editor = new CircuitEditor(panel, extensionUri);
+    CircuitEditor.instances.push(editor);
+    if (openFile) { editor.loadFromDisk(openFile); }
+  }
+
+  private readonly panel: vscode.WebviewPanel;
+  private currentPath: vscode.Uri | undefined;
+  private readonly disposables: vscode.Disposable[] = [];
+
+  private readonly extensionUri: vscode.Uri;
+
+  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+    this.panel = panel;
+    this.extensionUri = extensionUri;
+    this.panel.webview.html = this.renderHtml();
+    this.panel.webview.onDidReceiveMessage(
+      (msg) => this.handleMessage(msg).catch((err) => {
+        this.panel.webview.postMessage({ type: "error", message: String(err?.message ?? err) });
+      }),
+      null, this.disposables,
+    );
+    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+  }
+
+  private async handleMessage(msg: any): Promise<void> {
+    switch (msg?.type) {
+      case "save": return this.save(msg.payload as CircuitDoc, !!msg.asNew);
+      case "open": return this.openDialog();
+      case "exportHdl": return this.exportHdl(msg.payload as CircuitDoc);
+      case "importModule": return this.importModule(msg.ownName as string | undefined);
+      case "importHdlModule": return this.importHdlModule(msg.ownName as string | undefined);
+      case "openModule": return this.openModuleFile(msg.file as string);
+      case "reloadModules": return this.reloadModules(msg.modules as Array<{ name: string; file: string }>);
+      case "dirty": this.panel.title = msg.payload ? "Circuit Editor •" : "Circuit Editor"; return;
+    }
+  }
+
+  private async save(doc: CircuitDoc, asNew: boolean): Promise<void> {
+    let target = this.currentPath;
+    if (asNew || !target) {
+      const picked = await vscode.window.showSaveDialog({
+        filters: { Circuit: ["bscircuit.json", "json"] },
+        defaultUri: this.suggestedSaveUri(doc),
+        saveLabel: "Save Circuit",
+      });
+      if (!picked) { return; }
+      target = picked;
+    }
+    fs.writeFileSync(target.fsPath, JSON.stringify(doc, null, 2) + "\n", "utf8");
+    this.currentPath = target;
+    this.panel.webview.postMessage({ type: "saved", path: target.fsPath });
+    vscode.window.showInformationMessage(`Circuit saved: ${path.basename(target.fsPath)}`);
+  }
+
+  private suggestedSaveUri(doc: CircuitDoc): vscode.Uri | undefined {
+    const ws = vscode.workspace.workspaceFolders?.[0]?.uri;
+    if (!ws) { return undefined; }
+    return vscode.Uri.joinPath(ws, "src", `${doc.moduleName || "circuit"}${FILE_EXT}`);
+  }
+
+  private async openDialog(): Promise<void> {
+    const picked = await vscode.window.showOpenDialog({
+      canSelectFiles: true, canSelectFolders: false, canSelectMany: false,
+      filters: { Circuit: ["bscircuit.json", "json"] },
+    });
+    if (!picked || !picked[0]) { return; }
+    await this.loadFromDisk(picked[0]);
+  }
+
+  private async loadFromDisk(uri: vscode.Uri): Promise<void> {
+    const raw = fs.readFileSync(uri.fsPath, "utf8");
+    let doc: CircuitDoc;
+    try { doc = JSON.parse(raw) as CircuitDoc; }
+    catch (e: any) { throw new Error(`Failed to parse circuit JSON: ${e.message}`); }
+    this.currentPath = uri;
+    this.panel.webview.postMessage({ type: "loaded", payload: doc, path: uri.fsPath });
+  }
+
+  /**
+   * Pick a .bscircuit.json, extract its INPUT/OUTPUT ports as a
+   * ModuleInterface (widths parsed from labels), snapshot its body for
+   * self-contained Verilog emit + drill-down, and ship it back to the
+   * webview. Refuses imports that would form a cycle.
+   */
+  private async importModule(ownName?: string): Promise<void> {
+    const picked = await vscode.window.showOpenDialog({
+      canSelectFiles: true, canSelectFolders: false, canSelectMany: false,
+      filters: { Circuit: ["bscircuit.json", "json"] },
+    });
+    if (!picked || !picked[0]) { return; }
+    const iface = this.readModuleFromDisk(picked[0].fsPath);
+    const name = sanitize(iface.body?.moduleName || path.basename(picked[0].fsPath).replace(/\.[^.]+$/, ""));
+
+    // Cycle check — a child must not (transitively) reference us.
+    if (ownName && (name === sanitize(ownName) || (iface.body && referencesModule(iface.body, sanitize(ownName))))) {
+      throw new Error(`Refusing to import "${name}": would form a circular dependency with "${ownName}".`);
+    }
+    this.panel.webview.postMessage({ type: "moduleImported", name, iface });
+  }
+
+  /**
+   * Pick an HDL file (Verilog / SystemVerilog / VHDL), parse its module or
+   * entity declarations, and (if more than one) prompt the user for which
+   * to import. The chosen module becomes a leaf MODULE in the palette with
+   * its raw HDL source snapshotted so export can emit it verbatim when the
+   * output language matches.
+   */
+  private async importHdlModule(ownName?: string): Promise<void> {
+    const picked = await vscode.window.showOpenDialog({
+      canSelectFiles: true, canSelectFolders: false, canSelectMany: false,
+      filters: {
+        "Verilog": ["v", "vh"],
+        "SystemVerilog": ["sv", "svh"],
+        "VHDL": ["vhd", "vhdl"],
+        "All HDL": ["v", "vh", "sv", "svh", "vhd", "vhdl"],
+      },
+    });
+    if (!picked || !picked[0]) { return; }
+    const absPath = picked[0].fsPath;
+    const relPath = this.currentPath
+      ? path.relative(path.dirname(this.currentPath.fsPath), absPath).split(path.sep).join("/")
+      : absPath;
+    const { decls, language, source } = parseHdlFile(absPath, relPath);
+    if (!decls.length) {
+      throw new Error(`No module declarations found in ${path.basename(absPath)}.`);
+    }
+    let decl = decls[0];
+    if (decls.length > 1) {
+      const pick = await vscode.window.showQuickPick(
+        decls.map((d) => ({ label: d.name, description: `${d.ports.length} ports`, decl: d })),
+        { placeHolder: "Choose a module to import" },
+      );
+      if (!pick) { return; }
+      decl = pick.decl;
     }
 
-    private readonly panel: vscode.WebviewPanel;
-    private currentPath: vscode.Uri | undefined;
-    private readonly disposables: vscode.Disposable[] = [];
-
-    private readonly extensionUri: vscode.Uri;
-
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-        this.panel = panel;
-        this.extensionUri = extensionUri;
-        this.panel.webview.html = this.renderHtml();
-        this.panel.webview.onDidReceiveMessage(
-            (msg) => this.handleMessage(msg).catch((err) => {
-                this.panel.webview.postMessage({ type: "error", message: String(err?.message ?? err) });
-            }),
-            null, this.disposables,
-        );
-        this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+    if (ownName && sanitize(decl.name) === sanitize(ownName)) {
+      throw new Error(`Refusing to import "${decl.name}": same name as the current circuit.`);
     }
 
-    private async handleMessage(msg: any): Promise<void> {
-        switch (msg?.type) {
-            case "save":          return this.save(msg.payload as CircuitDoc, !!msg.asNew);
-            case "open":          return this.openDialog();
-            case "exportVerilog": return this.exportVerilog(msg.payload as CircuitDoc);
-            case "importModule":  return this.importModule(msg.ownName as string | undefined);
-            case "openModule":    return this.openModuleFile(msg.file as string);
-            case "reloadModules": return this.reloadModules(msg.modules as Array<{ name: string; file: string }>);
-            case "dirty":         this.panel.title = msg.payload ? "Circuit Editor •" : "Circuit Editor"; return;
+    const ins: ModulePort[] = [];
+    const outs: ModulePort[] = [];
+    for (const p of decl.ports) {
+      const entry: ModulePort = { label: p.name, width: p.width };
+      if (p.direction === "output") { outs.push(entry); } else { ins.push(entry); }
+    }
+    const iface: ModuleInterface = { ins, outs, file: relPath, hdlSource: source, language };
+    this.panel.webview.postMessage({ type: "moduleImported", name: decl.name, iface });
+  }
+
+  /**
+   * Read a single module file off disk and produce its ModuleInterface
+   * (used by both initial import and the "Reload Modules" action). Handles
+   * both .bscircuit.json sub-circuits and raw Verilog/SystemVerilog files.
+   */
+  private readModuleFromDisk(absPath: string, preferredName?: string): ModuleInterface {
+    const relPath = this.currentPath
+      ? path.relative(path.dirname(this.currentPath.fsPath), absPath).split(path.sep).join("/")
+      : absPath;
+    if (/\.(v|vh|sv|svh|vhd|vhdl)$/i.test(absPath)) {
+      const { decls, language, source } = parseHdlFile(absPath, relPath);
+      if (!decls.length) { throw new Error(`No module declarations found in ${path.basename(absPath)}.`); }
+      const decl = (preferredName && decls.find((d) => d.name === preferredName)) || decls[0];
+      const ins: ModulePort[] = [];
+      const outs: ModulePort[] = [];
+      for (const p of decl.ports) {
+        const entry: ModulePort = { label: p.name, width: p.width };
+        if (p.direction === "output") { outs.push(entry); } else { ins.push(entry); }
+      }
+      return { ins, outs, file: relPath, hdlSource: source, language };
+    }
+    const raw = fs.readFileSync(absPath, "utf8");
+    const child = JSON.parse(raw) as CircuitDoc;
+    const ins: ModulePort[] = [];
+    const outs: ModulePort[] = [];
+    for (const n of child.nodes) {
+      if (n.type === "INPUT") { ins.push(portFromLabel(n.label)); }
+      if (n.type === "OUTPUT") { outs.push(portFromLabel(n.label)); }
+    }
+    return { ins, outs, file: relPath, body: child };
+  }
+
+  /** Open a referenced module's source file in a new editor (drill-down). */
+  private async openModuleFile(relOrAbs: string): Promise<void> {
+    const abs = this.resolveModulePath(relOrAbs);
+    if (!abs) { throw new Error("Save this circuit first so module paths can be resolved."); }
+    if (!fs.existsSync(abs)) { throw new Error(`Module file not found: ${abs}`); }
+    // HDL sources open in a normal text editor; .bscircuit.json files spawn
+    // a fresh CircuitEditor via the host command.
+    if (/\.(v|vh|sv|svh|vhd|vhdl)$/i.test(abs)) {
+      await vscode.window.showTextDocument(vscode.Uri.file(abs), { preview: false });
+      return;
+    }
+    await vscode.commands.executeCommand("bitstream.openCircuit", vscode.Uri.file(abs));
+  }
+
+  /** Re-read every named module's body from disk and ship the refreshed interfaces back. */
+  private async reloadModules(entries: Array<{ name: string; file: string }>): Promise<void> {
+    const refreshed: Array<{ name: string; iface: ModuleInterface }> = [];
+    const missing: string[] = [];
+    for (const { name, file } of entries) {
+      const abs = this.resolveModulePath(file);
+      if (!abs || !fs.existsSync(abs)) { missing.push(name); continue; }
+      refreshed.push({ name, iface: this.readModuleFromDisk(abs, name) });
+    }
+    this.panel.webview.postMessage({ type: "modulesReloaded", refreshed, missing });
+  }
+
+  private resolveModulePath(relOrAbs: string): string | undefined {
+    if (!relOrAbs) { return undefined; }
+    if (path.isAbsolute(relOrAbs)) { return relOrAbs; }
+    if (!this.currentPath) { return undefined; }
+    return path.resolve(path.dirname(this.currentPath.fsPath), relOrAbs);
+  }
+
+  /**
+   * Prompt for the target HDL flavour, then run the language-aware emitter
+   * and write the result to a user-picked path. Imports of a different
+   * language than the target are listed in the result and surfaced as a
+   * warning so the user knows to feed those sources to their toolchain.
+   */
+  private async exportHdl(doc: CircuitDoc): Promise<void> {
+    type LangChoice = { label: string; description: string; lang: HdlLanguage; ext: string; filterName: string };
+    const choices: LangChoice[] = [
+      { label: "Verilog", description: ".v", lang: "verilog", ext: "v", filterName: "Verilog" },
+      { label: "SystemVerilog", description: ".sv", lang: "systemverilog", ext: "sv", filterName: "SystemVerilog" },
+      { label: "VHDL", description: ".vhd", lang: "vhdl", ext: "vhd", filterName: "VHDL" },
+    ];
+    const pick = await vscode.window.showQuickPick(choices, { placeHolder: "Export to which HDL?" });
+    if (!pick) { return; }
+
+    const result = generateHdl(doc, pick.lang);
+    const suggested = (() => {
+      const baseName = (() => {
+        if (this.currentPath) {
+          return path.basename(this.currentPath.fsPath).replace(/\.bscircuit\.json$|\.json$/i, "");
         }
+        return doc.moduleName || "circuit";
+      })();
+      const dir = this.currentPath
+        ? path.dirname(this.currentPath.fsPath)
+        : vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!dir) { return undefined; }
+      return vscode.Uri.file(path.join(dir, `${baseName}.${pick.ext}`));
+    })();
+    const target = await vscode.window.showSaveDialog({
+      filters: { [pick.filterName]: [pick.ext] },
+      defaultUri: suggested,
+      saveLabel: `Export ${pick.label}`,
+    });
+    if (!target) { return; }
+    fs.writeFileSync(target.fsPath, result.text, "utf8");
+    this.panel.webview.postMessage({ type: "info", message: `Exported: ${path.basename(target.fsPath)}` });
+
+    if (result.skipped.length) {
+      const names = result.skipped.map((s) => `${s.name} (${s.language})`).join(", ");
+      vscode.window.showWarningMessage(
+        `Exported ${pick.label}: ${path.basename(target.fsPath)}. ` +
+        `Skipped inlining ${result.skipped.length} mismatched-language module${result.skipped.length === 1 ? "" : "s"}: ${names}. ` +
+        `Instances reference them by name — add their source files to your toolchain.`,
+      );
+    } else {
+      vscode.window.showInformationMessage(`${pick.label} exported: ${path.basename(target.fsPath)}`);
     }
+  }
 
-    private async save(doc: CircuitDoc, asNew: boolean): Promise<void> {
-        let target = this.currentPath;
-        if (asNew || !target) {
-            const picked = await vscode.window.showSaveDialog({
-                filters: { Circuit: ["bscircuit.json", "json"] },
-                defaultUri: this.suggestedSaveUri(doc),
-                saveLabel: "Save Circuit",
-            });
-            if (!picked) { return; }
-            target = picked;
-        }
-        fs.writeFileSync(target.fsPath, JSON.stringify(doc, null, 2) + "\n", "utf8");
-        this.currentPath = target;
-        this.panel.webview.postMessage({ type: "saved", path: target.fsPath });
-        vscode.window.showInformationMessage(`Circuit saved: ${path.basename(target.fsPath)}`);
+  public dispose(): void {
+    for (const d of this.disposables) { d.dispose(); }
+    CircuitEditor.instances = CircuitEditor.instances.filter((e) => e !== this);
+  }
+
+  // ----- HTML --------------------------------------------------------------
+
+  private renderHtml(): string {
+    const gateNames = ["and", "or", "xor", "nand", "nor", "xnor", "not", "buf", "dff", "input", "output"] as const;
+    const gateUris: Record<string, string> = {};
+    for (const name of gateNames) {
+      const uri = this.panel.webview.asWebviewUri(
+        vscode.Uri.joinPath(this.extensionUri, "media", "gates", `${name}.svg`)
+      );
+      gateUris[name.toUpperCase()] = uri.toString();
     }
-
-    private suggestedSaveUri(doc: CircuitDoc): vscode.Uri | undefined {
-        const ws = vscode.workspace.workspaceFolders?.[0]?.uri;
-        if (!ws) { return undefined; }
-        return vscode.Uri.joinPath(ws, "src", `${doc.moduleName || "circuit"}${FILE_EXT}`);
-    }
-
-    private async openDialog(): Promise<void> {
-        const picked = await vscode.window.showOpenDialog({
-            canSelectFiles: true, canSelectFolders: false, canSelectMany: false,
-            filters: { Circuit: ["bscircuit.json", "json"] },
-        });
-        if (!picked || !picked[0]) { return; }
-        await this.loadFromDisk(picked[0]);
-    }
-
-    private async loadFromDisk(uri: vscode.Uri): Promise<void> {
-        const raw = fs.readFileSync(uri.fsPath, "utf8");
-        let doc: CircuitDoc;
-        try { doc = JSON.parse(raw) as CircuitDoc; }
-        catch (e: any) { throw new Error(`Failed to parse circuit JSON: ${e.message}`); }
-        this.currentPath = uri;
-        this.panel.webview.postMessage({ type: "loaded", payload: doc, path: uri.fsPath });
-    }
-
-    /**
-     * Pick a .bscircuit.json, extract its INPUT/OUTPUT ports as a
-     * ModuleInterface (widths parsed from labels), snapshot its body for
-     * self-contained Verilog emit + drill-down, and ship it back to the
-     * webview. Refuses imports that would form a cycle.
-     */
-    private async importModule(ownName?: string): Promise<void> {
-        const picked = await vscode.window.showOpenDialog({
-            canSelectFiles: true, canSelectFolders: false, canSelectMany: false,
-            filters: { Circuit: ["bscircuit.json", "json"] },
-        });
-        if (!picked || !picked[0]) { return; }
-        const iface = this.readModuleFromDisk(picked[0].fsPath);
-        const name = sanitize(iface.body?.moduleName || path.basename(picked[0].fsPath).replace(/\.[^.]+$/, ""));
-
-        // Cycle check — a child must not (transitively) reference us.
-        if (ownName && (name === sanitize(ownName) || (iface.body && referencesModule(iface.body, sanitize(ownName))))) {
-            throw new Error(`Refusing to import "${name}": would form a circular dependency with "${ownName}".`);
-        }
-        this.panel.webview.postMessage({ type: "moduleImported", name, iface });
-    }
-
-    /**
-     * Read a single .bscircuit.json off disk and produce its ModuleInterface
-     * (used by both initial import and the "Reload Modules" action).
-     */
-    private readModuleFromDisk(absPath: string): ModuleInterface {
-        const raw = fs.readFileSync(absPath, "utf8");
-        const child = JSON.parse(raw) as CircuitDoc;
-        const ins: ModulePort[]  = [];
-        const outs: ModulePort[] = [];
-        for (const n of child.nodes) {
-            if (n.type === "INPUT")  { ins.push(portFromLabel(n.label)); }
-            if (n.type === "OUTPUT") { outs.push(portFromLabel(n.label)); }
-        }
-        return {
-            ins, outs,
-            file: this.currentPath
-                ? path.relative(path.dirname(this.currentPath.fsPath), absPath).split(path.sep).join("/")
-                : absPath,
-            body: child,
-        };
-    }
-
-    /** Open a referenced module's source file in a new editor (drill-down). */
-    private async openModuleFile(relOrAbs: string): Promise<void> {
-        const abs = this.resolveModulePath(relOrAbs);
-        if (!abs) { throw new Error("Save this circuit first so module paths can be resolved."); }
-        if (!fs.existsSync(abs)) { throw new Error(`Module file not found: ${abs}`); }
-        // Use the host-level command so a fresh CircuitEditor instance owns it.
-        await vscode.commands.executeCommand("bitstream.openCircuit", vscode.Uri.file(abs));
-    }
-
-    /** Re-read every named module's body from disk and ship the refreshed interfaces back. */
-    private async reloadModules(entries: Array<{ name: string; file: string }>): Promise<void> {
-        const refreshed: Array<{ name: string; iface: ModuleInterface }> = [];
-        const missing: string[] = [];
-        for (const { name, file } of entries) {
-            const abs = this.resolveModulePath(file);
-            if (!abs || !fs.existsSync(abs)) { missing.push(name); continue; }
-            refreshed.push({ name, iface: this.readModuleFromDisk(abs) });
-        }
-        this.panel.webview.postMessage({ type: "modulesReloaded", refreshed, missing });
-    }
-
-    private resolveModulePath(relOrAbs: string): string | undefined {
-        if (!relOrAbs) { return undefined; }
-        if (path.isAbsolute(relOrAbs)) { return relOrAbs; }
-        if (!this.currentPath) { return undefined; }
-        return path.resolve(path.dirname(this.currentPath.fsPath), relOrAbs);
-    }
-
-    private async exportVerilog(doc: CircuitDoc): Promise<void> {
-        const verilog = generateVerilog(doc);
-        const suggested = (() => {
-            if (this.currentPath) {
-                const base = path.basename(this.currentPath.fsPath).replace(/\.bscircuit\.json$|\.json$/i, "");
-                return vscode.Uri.file(path.join(path.dirname(this.currentPath.fsPath), `${base}.v`));
-            }
-            const ws = vscode.workspace.workspaceFolders?.[0]?.uri;
-            return ws ? vscode.Uri.joinPath(ws, "src", `${doc.moduleName || "circuit"}.v`) : undefined;
-        })();
-        const target = await vscode.window.showSaveDialog({
-            filters: { Verilog: ["v", "sv"] },
-            defaultUri: suggested,
-            saveLabel: "Export Verilog",
-        });
-        if (!target) { return; }
-        fs.writeFileSync(target.fsPath, verilog, "utf8");
-        this.panel.webview.postMessage({ type: "info", message: `Exported: ${path.basename(target.fsPath)}` });
-        vscode.window.showInformationMessage(`Verilog exported: ${path.basename(target.fsPath)}`);
-    }
-
-    public dispose(): void {
-        for (const d of this.disposables) { d.dispose(); }
-        CircuitEditor.instances = CircuitEditor.instances.filter((e) => e !== this);
-    }
-
-    // ----- HTML --------------------------------------------------------------
-
-    private renderHtml(): string {
-        const gateNames = ["and", "or", "xor", "nand", "nor", "xnor", "not", "buf", "dff", "input", "output"] as const;
-        const gateUris: Record<string, string> = {};
-        for (const name of gateNames) {
-            const uri = this.panel.webview.asWebviewUri(
-                vscode.Uri.joinPath(this.extensionUri, "media", "gates", `${name}.svg`)
-            );
-            gateUris[name.toUpperCase()] = uri.toString();
-        }
-        const nonce = randomNonce();
-        const csp = [
-            `default-src 'none'`,
-            `style-src ${this.panel.webview.cspSource} 'unsafe-inline'`,
-            `script-src 'nonce-${nonce}'`,
-            `img-src ${this.panel.webview.cspSource} data:`,
-        ].join("; ");
-        return /* html */ `<!DOCTYPE html>
+    const nonce = randomNonce();
+    const csp = [
+      `default-src 'none'`,
+      `style-src ${this.panel.webview.cspSource} 'unsafe-inline'`,
+      `script-src 'nonce-${nonce}'`,
+      `img-src ${this.panel.webview.cspSource} data:`,
+    ].join("; ");
+    return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -318,8 +441,10 @@ export class CircuitEditor {
   svg.canvas.panning { cursor: grabbing; }
   svg.canvas.spacing  { cursor: grab; }
   .node rect:not(.hit) { fill: var(--vscode-editorWidget-background); stroke: var(--vscode-panel-border); stroke-width: 1.2; }
-  .node.selected rect:not(.hit) { stroke: var(--vscode-focusBorder); stroke-width: 2; }
   .node.module rect { fill: var(--vscode-textBlockQuote-background, var(--vscode-editorWidget-background)); }
+  .node.has-color rect:not(.hit) { fill: var(--node-color); }
+  .node.has-color .node-tint { fill: var(--node-color); fill-opacity: 0.35; stroke: var(--node-color); stroke-width: 1.5; }
+  .node.selected rect:not(.hit) { stroke: var(--vscode-focusBorder); stroke-width: 2; }
   .node .hit { fill: transparent; stroke: none; }
   .node.selected .hit { stroke: var(--vscode-focusBorder); stroke-width: 2; }
   body.vscode-dark image, body.vscode-high-contrast image { filter: invert(1); }
@@ -330,9 +455,14 @@ export class CircuitEditor {
   .pin.bus { stroke-width: 2.2; }
   .pin:hover { fill: var(--vscode-focusBorder); }
   .wire { fill: none; stroke: var(--vscode-charts-blue, #6ab0f3); stroke-width: 2; }
+  .wire.has-color { stroke: var(--wire-color); }
   .wire.bus { stroke-width: 3.5; }
   .wire.selected { stroke: var(--vscode-focusBorder); }
   .wire.pending { stroke-dasharray: 4 4; opacity: 0.7; }
+  .waypoint { fill: var(--vscode-editor-background); stroke: var(--vscode-focusBorder); stroke-width: 1.5; cursor: move; }
+  .waypoint:hover { fill: var(--vscode-focusBorder); }
+  .color-control { display: inline-flex; align-items: center; gap: 0.25rem; }
+  .color-control input[type="color"] { width: 28px; height: 22px; border: 1px solid var(--vscode-panel-border); background: transparent; padding: 0; cursor: pointer; }
   .wire-label { fill: var(--vscode-descriptionForeground); font-size: 9px; pointer-events: none; }
   .rubber { fill: var(--vscode-focusBorder); fill-opacity: 0.08; stroke: var(--vscode-focusBorder); stroke-dasharray: 3 3; }
   .hint { position: absolute; bottom: 0.5rem; left: 0.5rem; opacity: 0.55; font-size: 0.75rem; pointer-events: none; }
@@ -346,9 +476,12 @@ export class CircuitEditor {
     <button id="btnOpen">Open…</button>
     <button id="btnSave">Save</button>
     <button id="btnSaveAs">Save As…</button>
-    <button id="btnExport">Export Verilog…</button>
+    <button id="btnExport" title="Export to Verilog, SystemVerilog, or VHDL">Export HDL…</button>
     <button id="btnUndo" class="ghost" title="Ctrl/Cmd+Z">Undo</button>
     <button id="btnRedo" class="ghost" title="Ctrl/Cmd+Shift+Z">Redo</button>
+    <button id="btnRouting" class="ghost" title="Toggle curved vs straight wires. Straight wires support routing waypoints.">Wires: curved</button>
+    <label class="color-control" title="Color of the current selection (nodes or wire)"><input id="colorPicker" type="color" value="#6ab0f3" /></label>
+    <button id="btnClearColor" class="ghost" title="Remove color override from selection">Clear color</button>
     <span class="spacer"></span>
     <label>Module: <input id="moduleName" type="text" value="circuit" size="20" /></label>
     <span class="status" id="status"></span>
@@ -371,7 +504,8 @@ export class CircuitEditor {
       <div class="item" draggable="true" data-type="DFF">DFF</div>
       <h3>Modules</h3>
       <div id="moduleList"></div>
-      <button class="add" id="btnImportModule">+ Import from File…</button>
+      <button class="add" id="btnImportModule">+ Import Circuit Module…</button>
+      <button class="add" id="btnImportHdl" title="Import a Verilog/SystemVerilog module as a component">+ Import HDL Module…</button>
       <button class="add" id="btnReloadModules" title="Re-read every imported module from its source file">⟳ Reload from disk</button>
     </div>
     <div class="canvas-wrap">
@@ -395,7 +529,7 @@ ${WEBVIEW_SCRIPT}
 </script>
 </body>
 </html>`;
-    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -403,31 +537,53 @@ ${WEBVIEW_SCRIPT}
 // ---------------------------------------------------------------------------
 
 function sanitize(s: string): string {
-    return (s || "").replace(/[^A-Za-z0-9_]/g, "_") || "u";
+  return (s || "").replace(/[^A-Za-z0-9_]/g, "_") || "u";
+}
+
+/** Map a file extension to one of the supported HDL flavours. */
+function detectHdlLanguage(absPath: string): HdlLanguage {
+  const ext = path.extname(absPath).toLowerCase();
+  if (ext === ".vhd" || ext === ".vhdl") { return "vhdl"; }
+  if (ext === ".sv" || ext === ".svh") { return "systemverilog"; }
+  return "verilog";
+}
+
+/**
+ * Read an HDL file and dispatch to the right parser. Returns the module
+ * declarations, the detected language, and the raw file contents (which the
+ * caller snapshots into the circuit document so export stays self-contained).
+ */
+function parseHdlFile(absPath: string, relPath: string): { decls: ModuleDecl[]; language: HdlLanguage; source: string } {
+  const source = fs.readFileSync(absPath, "utf8");
+  const language = detectHdlLanguage(absPath);
+  const decls = language === "vhdl"
+    ? parseVhdlText(source, relPath)
+    : parseVerilogText(source, relPath);
+  return { decls, language, source };
 }
 
 /** Parse a port label like `data[7:0]` into { name, width }. */
 function portFromLabel(label: string): ModulePort {
-    const m = /^([A-Za-z_]\w*)\s*\[\s*(\d+)\s*:\s*(\d+)\s*\]\s*$/.exec((label || "").trim());
-    if (m) {
-        const hi = parseInt(m[2], 10), lo = parseInt(m[3], 10);
-        return { label: m[1], width: Math.abs(hi - lo) + 1 };
-    }
-    const m2 = /^([A-Za-z_]\w*)\s*$/.exec((label || "").trim());
-    return { label: m2 ? m2[1] : sanitize(label), width: 1 };
+  const m = /^([A-Za-z_]\w*)\s*\[\s*(\d+)\s*:\s*(\d+)\s*\]\s*$/.exec((label || "").trim());
+  if (m) {
+    const hi = parseInt(m[2], 10), lo = parseInt(m[3], 10);
+    return { label: m[1], width: Math.abs(hi - lo) + 1 };
+  }
+  const m2 = /^([A-Za-z_]\w*)\s*$/.exec((label || "").trim());
+  return { label: m2 ? m2[1] : sanitize(label), width: 1 };
 }
 
 function widthDecl(width: number): string {
-    return width > 1 ? `[${width - 1}:0] ` : "";
+  return width > 1 ? `[${width - 1}:0] ` : "";
 }
 
 /** True if `doc` or any nested module body uses (sanitized) `targetName`. */
 function referencesModule(doc: CircuitDoc, targetName: string): boolean {
-    if (sanitize(doc.moduleName) === targetName) { return true; }
-    for (const m of Object.values(doc.modules ?? {})) {
-        if (m.body && referencesModule(m.body, targetName)) { return true; }
-    }
-    return false;
+  if (sanitize(doc.moduleName) === targetName) { return true; }
+  for (const m of Object.values(doc.modules ?? {})) {
+    if (m.body && referencesModule(m.body, targetName)) { return true; }
+  }
+  return false;
 }
 
 /**
@@ -435,155 +591,334 @@ function referencesModule(doc: CircuitDoc, targetName: string): boolean {
  * sanitized name. First-write-wins, so two trees with the same module
  * name keep the first body encountered — emit conflicts are surfaced
  * to the user separately by the caller if needed.
+ *
+ * HDL-imported modules (those with `hdlSource`) are collected into
+ * `hdlSources` when they're language-compatible with the export target.
+ * Mismatched-language imports go into `skipped` so the caller can warn —
+ * the instance still gets emitted but the user must supply the source
+ * file separately through the toolchain. Verilog and SystemVerilog are
+ * treated as mutually compatible for inlining; VHDL is its own bucket.
  */
-function collectModuleBodies(doc: CircuitDoc, acc: Map<string, CircuitDoc>): void {
-    for (const [name, m] of Object.entries(doc.modules ?? {})) {
-        const key = sanitize(name);
-        if (acc.has(key) || !m.body) { continue; }
-        acc.set(key, m.body);
-        collectModuleBodies(m.body, acc);
+function collectModuleArtifacts(
+  doc: CircuitDoc,
+  bodies: Map<string, CircuitDoc>,
+  hdlSources: Map<string, string>,
+  skipped: Array<{ name: string; language: HdlLanguage }>,
+  target: HdlLanguage,
+): void {
+  for (const [name, m] of Object.entries(doc.modules ?? {})) {
+    const key = sanitize(name);
+    if (m.hdlSource) {
+      const lang: HdlLanguage = m.language ?? "verilog";
+      const compatible = target === "vhdl" ? lang === "vhdl" : lang !== "vhdl";
+      if (compatible) {
+        if (!hdlSources.has(key) && !bodies.has(key)) { hdlSources.set(key, m.hdlSource); }
+      } else if (!skipped.some((s) => s.name === name)) {
+        skipped.push({ name, language: lang });
+      }
+      continue;
     }
+    if (bodies.has(key) || !m.body) { continue; }
+    bodies.set(key, m.body);
+    collectModuleArtifacts(m.body, bodies, hdlSources, skipped, target);
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Verilog generation
+// HDL generation
 // ---------------------------------------------------------------------------
+
+export interface HdlGenerateResult {
+  text: string;
+  /** Modules whose snapshotted HDL source was not inlined because it's a
+   *  different language than the export target. Instances still appear in
+   *  the output; the user must add the source via their toolchain. */
+  skipped: Array<{ name: string; language: HdlLanguage }>;
+}
 
 /**
- * Emit synthesisable Verilog for the top doc plus every transitively
- * referenced module body. Each module is emitted once (deduped by
- * sanitized name); the top module is emitted last so dependents appear
- * before their references.
+ * Emit HDL for the top doc plus every transitively referenced module body
+ * in the requested target language. Each synthesised module is emitted
+ * once (deduped by sanitized name); the top module comes last so
+ * dependents appear before their references.
  */
-export function generateVerilog(doc: CircuitDoc): string {
-    const all = new Map<string, CircuitDoc>();
-    collectModuleBodies(doc, all);
-    const parts: string[] = [];
-    // Dependencies first — order helps readability but doesn't affect synthesis.
-    for (const body of all.values()) { parts.push(emitOneModule(body)); }
-    parts.push(emitOneModule(doc));
-    return parts.join("\n");
+export function generateHdl(doc: CircuitDoc, target: HdlLanguage): HdlGenerateResult {
+  const bodies = new Map<string, CircuitDoc>();
+  const hdlSources = new Map<string, string>();
+  const skipped: Array<{ name: string; language: HdlLanguage }> = [];
+  collectModuleArtifacts(doc, bodies, hdlSources, skipped, target);
+
+  const parts: string[] = [];
+  for (const src of hdlSources.values()) { parts.push(src.trimEnd() + "\n"); }
+  if (target === "vhdl") {
+    for (const body of bodies.values()) { parts.push(emitVhdlEntity(body)); }
+    parts.push(emitVhdlEntity(doc));
+  } else {
+    const useLogic = target === "systemverilog";
+    for (const body of bodies.values()) { parts.push(emitVerilogModule(body, useLogic)); }
+    parts.push(emitVerilogModule(doc, useLogic));
+  }
+  return { text: parts.join("\n"), skipped };
 }
 
-/** Emit a single module — internal helper used by generateVerilog. */
-function emitOneModule(doc: CircuitDoc): string {
-    const moduleName = sanitize(doc.moduleName || "circuit");
-    const modules = doc.modules ?? {};
+/** Backwards-compatible Verilog-only entry point. */
+export function generateVerilog(doc: CircuitDoc): string {
+  return generateHdl(doc, "verilog").text;
+}
 
-    const inputs  = doc.nodes.filter((n) => n.type === "INPUT");
-    const outputs = doc.nodes.filter((n) => n.type === "OUTPUT");
-    const internals = doc.nodes.filter((n) => n.type !== "INPUT" && n.type !== "OUTPUT");
+/**
+ * Emit a single module in Verilog or SystemVerilog. SV swaps `wire`/`reg`
+ * for `logic` throughout — the synthesis semantics are otherwise identical
+ * for what this editor generates.
+ */
+function emitVerilogModule(doc: CircuitDoc, useLogic: boolean): string {
+  const netKw = useLogic ? "logic" : "wire";
+  const regKw = useLogic ? "logic" : "reg ";
+  const portKw = useLogic ? "logic" : "wire";
+  const moduleName = sanitize(doc.moduleName || "circuit");
+  const modules = doc.modules ?? {};
 
-    // For each (sinkId, pinIdx) record the driving net name.
-    const driverOf = new Map<string, string>();
-    for (const w of doc.wires) {
-        const src = doc.nodes.find((n) => n.id === w.from.id);
-        if (!src) { continue; }
-        let net: string;
-        if (src.type === "INPUT") {
-            net = portFromLabel(src.label).label;
-        } else if (src.type === "MODULE" && src.moduleRef && modules[src.moduleRef]) {
-            // Each module instance gets one wire per output pin.
-            net = `n_${sanitize(src.id)}_o${w.from.pin}`;
-        } else {
-            net = `n_${sanitize(src.id)}`;
-        }
-        driverOf.set(`${w.to.id}:${w.to.pin}`, net);
+  const inputs = doc.nodes.filter((n) => n.type === "INPUT");
+  const outputs = doc.nodes.filter((n) => n.type === "OUTPUT");
+  const internals = doc.nodes.filter((n) => n.type !== "INPUT" && n.type !== "OUTPUT");
+
+  // For each (sinkId, pinIdx) record the driving net name.
+  const driverOf = new Map<string, string>();
+  for (const w of doc.wires) {
+    const src = doc.nodes.find((n) => n.id === w.from.id);
+    if (!src) { continue; }
+    let net: string;
+    if (src.type === "INPUT") {
+      net = portFromLabel(src.label).label;
+    } else if (src.type === "MODULE" && src.moduleRef && modules[src.moduleRef]) {
+      // Each module instance gets one wire per output pin.
+      net = `n_${sanitize(src.id)}_o${w.from.pin}`;
+    } else {
+      net = `n_${sanitize(src.id)}`;
     }
-    const sinkOf = (nodeId: string, pin: number, width = 1): string =>
-        driverOf.get(`${nodeId}:${pin}`) ?? (width > 1 ? `${width}'d0` : `1'b0`);
+    driverOf.set(`${w.to.id}:${w.to.pin}`, net);
+  }
+  const sinkOf = (nodeId: string, pin: number, width = 1): string =>
+    driverOf.get(`${nodeId}:${pin}`) ?? (width > 1 ? `${width}'d0` : `1'b0`);
 
-    // Port list.
-    const inPorts  = inputs.map((n) => portFromLabel(n.label));
-    const outPorts = outputs.map((n) => portFromLabel(n.label));
-    const portList = [...inPorts, ...outPorts].map((p) => p.label);
+  // Port list.
+  const inPorts = inputs.map((n) => portFromLabel(n.label));
+  const outPorts = outputs.map((n) => portFromLabel(n.label));
+  const portList = [...inPorts, ...outPorts].map((p) => p.label);
 
-    const out: string[] = [];
-    out.push(`// Auto-generated by Bitstream Circuit Editor.`);
-    out.push(`module ${moduleName} (${portList.join(", ")});`);
-    for (const p of inPorts)  { out.push(`    input  wire ${widthDecl(p.width)}${p.label};`); }
-    for (const p of outPorts) { out.push(`    output wire ${widthDecl(p.width)}${p.label};`); }
-    out.push(``);
+  const out: string[] = [];
+  out.push(`// Auto-generated by Bitstream Circuit Editor.`);
+  out.push(`module ${moduleName} (${portList.join(", ")});`);
+  for (const p of inPorts) { out.push(`    input  ${portKw} ${widthDecl(p.width)}${p.label};`); }
+  for (const p of outPorts) { out.push(`    output ${portKw} ${widthDecl(p.width)}${p.label};`); }
+  out.push(``);
 
-    // Declare internal nets. DFFs become regs; module instances expose one
-    // wire per output pin with the module's declared width.
-    for (const n of internals) {
-        if (n.type === "DFF") {
-            out.push(`    reg  n_${sanitize(n.id)};`);
-        } else if (n.type === "MODULE") {
-            const iface = n.moduleRef ? modules[n.moduleRef] : undefined;
-            if (!iface) { continue; }
-            iface.outs.forEach((p, i) => {
-                out.push(`    wire ${widthDecl(p.width)}n_${sanitize(n.id)}_o${i};`);
-            });
-        } else {
-            out.push(`    wire n_${sanitize(n.id)};`);
-        }
+  // Declare internal nets. DFFs become regs (or logic in SV); module
+  // instances expose one wire per output pin with the module's declared width.
+  for (const n of internals) {
+    if (n.type === "DFF") {
+      out.push(`    ${regKw} n_${sanitize(n.id)};`);
+    } else if (n.type === "MODULE") {
+      const iface = n.moduleRef ? modules[n.moduleRef] : undefined;
+      if (!iface) { continue; }
+      iface.outs.forEach((p, i) => {
+        out.push(`    ${netKw} ${widthDecl(p.width)}n_${sanitize(n.id)}_o${i};`);
+      });
+    } else {
+      out.push(`    ${netKw} n_${sanitize(n.id)};`);
     }
-    out.push(``);
+  }
+  out.push(``);
 
-    // Combinational + sequential + module instances.
-    const binop = (op: string, n: CircuitNode, invert = false) => {
-        const expr = `${sinkOf(n.id, 0)} ${op} ${sinkOf(n.id, 1)}`;
-        out.push(`    assign n_${sanitize(n.id)} = ${invert ? `~(${expr})` : expr};`);
-    };
-    for (const n of internals) {
-        switch (n.type) {
-            case "AND":  binop("&",  n);       break;
-            case "OR":   binop("|",  n);       break;
-            case "XOR":  binop("^",  n);       break;
-            case "NAND": binop("&",  n, true); break;
-            case "NOR":  binop("|",  n, true); break;
-            case "XNOR": binop("^",  n, true); break;
-            case "NOT":  out.push(`    assign n_${sanitize(n.id)} = ~${sinkOf(n.id, 0)};`); break;
-            case "BUF":  out.push(`    assign n_${sanitize(n.id)} =  ${sinkOf(n.id, 0)};`); break;
-            case "DFF":  /* below */ break;
-            case "MODULE": {
-                const iface = n.moduleRef ? modules[n.moduleRef] : undefined;
-                if (!iface || !n.moduleRef) { break; }
-                const inst = `inst_${sanitize(n.id)}`;
-                const connections: string[] = [];
-                iface.ins.forEach((p, i) => {
-                    connections.push(`.${p.label}(${sinkOf(n.id, i, p.width)})`);
-                });
-                iface.outs.forEach((p, i) => {
-                    connections.push(`.${p.label}(n_${sanitize(n.id)}_o${i})`);
-                });
-                out.push(``);
-                out.push(`    ${sanitize(n.moduleRef)} ${inst} (`);
-                out.push(connections.map((c) => `        ${c}`).join(",\n"));
-                out.push(`    );`);
-                break;
-            }
-        }
-    }
-
-    const dffs = internals.filter((n) => n.type === "DFF");
-    if (dffs.length) {
+  // Combinational + sequential + module instances.
+  const binop = (op: string, n: CircuitNode, invert = false) => {
+    const expr = `${sinkOf(n.id, 0)} ${op} ${sinkOf(n.id, 1)}`;
+    out.push(`    assign n_${sanitize(n.id)} = ${invert ? `~(${expr})` : expr};`);
+  };
+  for (const n of internals) {
+    switch (n.type) {
+      case "AND": binop("&", n); break;
+      case "OR": binop("|", n); break;
+      case "XOR": binop("^", n); break;
+      case "NAND": binop("&", n, true); break;
+      case "NOR": binop("|", n, true); break;
+      case "XNOR": binop("^", n, true); break;
+      case "NOT": out.push(`    assign n_${sanitize(n.id)} = ~${sinkOf(n.id, 0)};`); break;
+      case "BUF": out.push(`    assign n_${sanitize(n.id)} =  ${sinkOf(n.id, 0)};`); break;
+      case "DFF":  /* below */ break;
+      case "MODULE": {
+        const iface = n.moduleRef ? modules[n.moduleRef] : undefined;
+        if (!iface || !n.moduleRef) { break; }
+        const inst = `inst_${sanitize(n.id)}`;
+        const connections: string[] = [];
+        iface.ins.forEach((p, i) => {
+          connections.push(`.${p.label}(${sinkOf(n.id, i, p.width)})`);
+        });
+        iface.outs.forEach((p, i) => {
+          connections.push(`.${p.label}(n_${sanitize(n.id)}_o${i})`);
+        });
         out.push(``);
-        for (const n of dffs) {
-            const d = sinkOf(n.id, 0), clk = sinkOf(n.id, 1);
-            out.push(`    always @(posedge ${clk}) n_${sanitize(n.id)} <= ${d};`);
-        }
+        out.push(`    ${sanitize(n.moduleRef)} ${inst} (`);
+        out.push(connections.map((c) => `        ${c}`).join(",\n"));
+        out.push(`    );`);
+        break;
+      }
     }
+  }
 
-    if (outputs.length) {
-        out.push(``);
-        for (const o of outputs) {
-            const p = portFromLabel(o.label);
-            out.push(`    assign ${p.label} = ${sinkOf(o.id, 0, p.width)};`);
-        }
-    }
-    out.push(`endmodule`);
+  const dffs = internals.filter((n) => n.type === "DFF");
+  if (dffs.length) {
     out.push(``);
-    return out.join("\n");
+    for (const n of dffs) {
+      const d = sinkOf(n.id, 0), clk = sinkOf(n.id, 1);
+      out.push(`    always @(posedge ${clk}) n_${sanitize(n.id)} <= ${d};`);
+    }
+  }
+
+  if (outputs.length) {
+    out.push(``);
+    for (const o of outputs) {
+      const p = portFromLabel(o.label);
+      out.push(`    assign ${p.label} = ${sinkOf(o.id, 0, p.width)};`);
+    }
+  }
+  out.push(`endmodule`);
+  out.push(``);
+  return out.join("\n");
+}
+
+/**
+ * Emit a single circuit as a VHDL entity + rtl architecture. Multi-bit ports
+ * become `std_logic_vector`; 1-bit ports stay `std_logic`. Internal gate
+ * nets are always 1-bit `std_logic`. Module instances use VHDL '93 direct
+ * entity instantiation (`entity work.<name>`) so no separate component
+ * declarations are needed.
+ */
+function emitVhdlEntity(doc: CircuitDoc): string {
+  const moduleName = sanitize(doc.moduleName || "circuit");
+  const modules = doc.modules ?? {};
+
+  const inputs = doc.nodes.filter((n) => n.type === "INPUT");
+  const outputs = doc.nodes.filter((n) => n.type === "OUTPUT");
+  const internals = doc.nodes.filter((n) => n.type !== "INPUT" && n.type !== "OUTPUT");
+
+  const driverOf = new Map<string, string>();
+  for (const w of doc.wires) {
+    const src = doc.nodes.find((n) => n.id === w.from.id);
+    if (!src) { continue; }
+    let net: string;
+    if (src.type === "INPUT") {
+      net = portFromLabel(src.label).label;
+    } else if (src.type === "MODULE" && src.moduleRef && modules[src.moduleRef]) {
+      net = `n_${sanitize(src.id)}_o${w.from.pin}`;
+    } else {
+      net = `n_${sanitize(src.id)}`;
+    }
+    driverOf.set(`${w.to.id}:${w.to.pin}`, net);
+  }
+  const sinkOf = (nodeId: string, pin: number, width = 1): string =>
+    driverOf.get(`${nodeId}:${pin}`) ?? (width > 1 ? `(others => '0')` : `'0'`);
+
+  const vhdlType = (w: number): string =>
+    w > 1 ? `std_logic_vector(${w - 1} downto 0)` : `std_logic`;
+
+  const inPorts = inputs.map((n) => portFromLabel(n.label));
+  const outPorts = outputs.map((n) => portFromLabel(n.label));
+
+  const out: string[] = [];
+  out.push(`-- Auto-generated by Bitstream Circuit Editor.`);
+  out.push(`library ieee;`);
+  out.push(`use ieee.std_logic_1164.all;`);
+  out.push(``);
+  out.push(`entity ${moduleName} is`);
+  if (inPorts.length || outPorts.length) {
+    const portLines: string[] = [];
+    for (const p of inPorts) { portLines.push(`        ${p.label} : in  ${vhdlType(p.width)}`); }
+    for (const p of outPorts) { portLines.push(`        ${p.label} : out ${vhdlType(p.width)}`); }
+    out.push(`    port (`);
+    out.push(portLines.join(";\n"));
+    out.push(`    );`);
+  }
+  out.push(`end entity ${moduleName};`);
+  out.push(``);
+  out.push(`architecture rtl of ${moduleName} is`);
+
+  for (const n of internals) {
+    if (n.type === "MODULE") {
+      const iface = n.moduleRef ? modules[n.moduleRef] : undefined;
+      if (!iface) { continue; }
+      iface.outs.forEach((p, i) => {
+        out.push(`    signal n_${sanitize(n.id)}_o${i} : ${vhdlType(p.width)};`);
+      });
+    } else {
+      // Gates and DFFs alike: 1-bit std_logic net carrying the gate result.
+      out.push(`    signal n_${sanitize(n.id)} : std_logic;`);
+    }
+  }
+  out.push(`begin`);
+
+  const binop = (op: string, n: CircuitNode) => {
+    out.push(`    n_${sanitize(n.id)} <= ${sinkOf(n.id, 0)} ${op} ${sinkOf(n.id, 1)};`);
+  };
+  for (const n of internals) {
+    switch (n.type) {
+      case "AND": binop("and", n); break;
+      case "OR": binop("or", n); break;
+      case "XOR": binop("xor", n); break;
+      case "NAND": binop("nand", n); break;
+      case "NOR": binop("nor", n); break;
+      case "XNOR": binop("xnor", n); break;
+      case "NOT": out.push(`    n_${sanitize(n.id)} <= not ${sinkOf(n.id, 0)};`); break;
+      case "BUF": out.push(`    n_${sanitize(n.id)} <=     ${sinkOf(n.id, 0)};`); break;
+      case "DFF": {
+        const d = sinkOf(n.id, 0), clk = sinkOf(n.id, 1);
+        out.push(``);
+        out.push(`    process(${clk})`);
+        out.push(`    begin`);
+        out.push(`        if rising_edge(${clk}) then`);
+        out.push(`            n_${sanitize(n.id)} <= ${d};`);
+        out.push(`        end if;`);
+        out.push(`    end process;`);
+        break;
+      }
+      case "MODULE": {
+        const iface = n.moduleRef ? modules[n.moduleRef] : undefined;
+        if (!iface || !n.moduleRef) { break; }
+        const inst = `inst_${sanitize(n.id)}`;
+        const conns: string[] = [];
+        iface.ins.forEach((p, i) => {
+          conns.push(`            ${p.label} => ${sinkOf(n.id, i, p.width)}`);
+        });
+        iface.outs.forEach((p, i) => {
+          conns.push(`            ${p.label} => n_${sanitize(n.id)}_o${i}`);
+        });
+        out.push(``);
+        out.push(`    ${inst} : entity work.${sanitize(n.moduleRef)}`);
+        out.push(`        port map (`);
+        out.push(conns.join(",\n"));
+        out.push(`        );`);
+        break;
+      }
+    }
+  }
+
+  if (outputs.length) {
+    out.push(``);
+    for (const o of outputs) {
+      const p = portFromLabel(o.label);
+      out.push(`    ${p.label} <= ${sinkOf(o.id, 0, p.width)};`);
+    }
+  }
+  out.push(`end architecture rtl;`);
+  out.push(``);
+  return out.join("\n");
 }
 
 function randomNonce(): string {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let s = "";
-    for (let i = 0; i < 32; i++) { s += chars.charAt(Math.floor(Math.random() * chars.length)); }
-    return s;
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let s = "";
+  for (let i = 0; i < 32; i++) { s += chars.charAt(Math.floor(Math.random() * chars.length)); }
+  return s;
 }
 
 // ---------------------------------------------------------------------------
@@ -647,12 +982,13 @@ function parseLabel(label) {
 }
 
 // ----- State ----------------------------------------------------------------
-let doc = { moduleName: 'circuit', nodes: [], wires: [], modules: {} };
+let doc = { moduleName: 'circuit', nodes: [], wires: [], modules: {}, routingStyle: 'curved' };
 let nextId = 1;
 let selectedNodes = new Set();
 let selectedWire = null;
 let pendingWire = null;          // { from, mouse }
 let dragging = null;             // { dx: Map<id, {dx,dy}>, moved: boolean }
+let draggingWaypoint = null;     // { wire, idx, dx, dy, moved, pre }
 let panning = null;              // { startX, startY, startTx, startTy }
 let spaceHeld = false;
 let rubber = null;               // { x0, y0, x1, y1 }
@@ -670,9 +1006,90 @@ const footer = document.getElementById('footer');
 const zoomLabel = document.getElementById('zoomLabel');
 const moduleNameInput = document.getElementById('moduleName');
 const moduleListEl = document.getElementById('moduleList');
+const btnRouting = document.getElementById('btnRouting');
+const colorPicker = document.getElementById('colorPicker');
+const btnClearColor = document.getElementById('btnClearColor');
+const DEFAULT_PICKER_COLOR = '#6ab0f3';
 
 function freshId() { return 'n' + (nextId++); }
 function setDirty(v) { if (dirty === v) return; dirty = v; vscode.postMessage({ type: 'dirty', payload: v }); }
+function routingStyle() { return doc.routingStyle || 'curved'; }
+function updateRoutingButton() {
+  btnRouting.textContent = 'Wires: ' + routingStyle();
+}
+function isHexColor(v) {
+  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v || '');
+}
+function selectionColor() {
+  if (selectedWire) return selectedWire.color || null;
+  if (!selectedNodes.size) return null;
+  let color = null;
+  for (const id of selectedNodes) {
+    const node = doc.nodes.find((n) => n.id === id);
+    if (!node || !node.color) return null;
+    if (color == null) color = node.color;
+    else if (color !== node.color) return null;
+  }
+  return color;
+}
+function syncColorPickerToSelection() {
+  const hasSelection = !!selectedWire || selectedNodes.size > 0;
+  const color = selectionColor();
+  colorPicker.disabled = !hasSelection;
+  btnClearColor.disabled = !hasSelection || !color;
+  const next = color && isHexColor(color) ? color : DEFAULT_PICKER_COLOR;
+  if (colorPicker.value !== next) colorPicker.value = next;
+}
+
+function applySelectionColor(color) {
+  if (selectedWire) {
+    if (selectedWire.color === color) return;
+    pushHistory();
+    selectedWire.color = color;
+    setDirty(true);
+    render();
+    return;
+  }
+  if (!selectedNodes.size) return;
+  let changed = false;
+  for (const id of selectedNodes) {
+    const node = doc.nodes.find((n) => n.id === id);
+    if (node && node.color !== color) { changed = true; break; }
+  }
+  if (!changed) return;
+  pushHistory();
+  for (const id of selectedNodes) {
+    const node = doc.nodes.find((n) => n.id === id);
+    if (node) node.color = color;
+  }
+  setDirty(true);
+  render();
+}
+
+function clearSelectionColor() {
+  if (selectedWire) {
+    if (!selectedWire.color) return;
+    pushHistory();
+    delete selectedWire.color;
+    setDirty(true);
+    render();
+    return;
+  }
+  if (!selectedNodes.size) return;
+  let changed = false;
+  for (const id of selectedNodes) {
+    const node = doc.nodes.find((n) => n.id === id);
+    if (node && node.color) { changed = true; break; }
+  }
+  if (!changed) return;
+  pushHistory();
+  for (const id of selectedNodes) {
+    const node = doc.nodes.find((n) => n.id === id);
+    if (node && node.color) delete node.color;
+  }
+  setDirty(true);
+  render();
+}
 
 function defaultLabel(type, moduleRef) {
   if (type === 'MODULE') {
@@ -715,6 +1132,8 @@ function resyncAfterReplace() {
   moduleNameInput.value = doc.moduleName || 'circuit';
   rebuildModulePalette();
   selectedNodes.clear(); selectedWire = null; pendingWire = null;
+  updateRoutingButton();
+  syncColorPickerToSelection();
   setDirty(true);
   render();
 }
@@ -796,6 +1215,7 @@ function _render() {
   // Wires first so node bodies overlay endpoints. A wire is drawn unless
   // *both* endpoints are culled — otherwise it'd disappear when one end is
   // pulled off-screen during a drag.
+  const straightMode = routingStyle() === 'straight';
   for (const w of doc.wires) {
     if (culled.has(w.from.id) && culled.has(w.to.id)) continue;
     const src = doc.nodes.find((n) => n.id === w.from.id);
@@ -804,15 +1224,35 @@ function _render() {
     const a = pinPos(src, w.from.side, w.from.pin);
     const b = pinPos(dst, w.to.side,   w.to.pin);
     const width = Math.max(pinWidth(src, 'out', w.from.pin), pinWidth(dst, 'in', w.to.pin));
-    const klass = 'wire' + (width > 1 ? ' bus' : '') + (selectedWire === w ? ' selected' : '');
-    const path = svgEl('path', { d: bezier(a, b), class: klass });
-    path.addEventListener('mousedown', (e) => { e.stopPropagation(); selectedWire = w; selectedNodes.clear(); render(); });
+    const isSelected = selectedWire === w;
+    const hasColor = !!w.color;
+    const klass = 'wire'
+      + (width > 1 ? ' bus' : '')
+      + (isSelected ? ' selected' : '')
+      + (hasColor ? ' has-color' : '');
+    const path = svgEl('path', { d: wirePath(a, b, w), class: klass });
+    if (hasColor) path.style.setProperty('--wire-color', w.color);
+    path.addEventListener('mousedown', (e) => { e.stopPropagation(); selectedWire = w; selectedNodes.clear(); syncColorPickerToSelection(); render(); });
+    path.addEventListener('dblclick', (e) => {
+      if (!straightMode) return;
+      e.stopPropagation();
+      insertWaypoint(w, clientToContent(e));
+    });
     viewport.appendChild(path);
     if (width > 1 && lod === 'high') {
       const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 - 4;
       const tag = svgEl('text', { class: 'wire-label', x: mx, y: my, 'text-anchor': 'middle' });
       tag.textContent = '[' + width + ']';
       viewport.appendChild(tag);
+    }
+    // Waypoint handles render only for the selected wire in straight mode —
+    // keeps the canvas quiet when the user isn't routing.
+    if (isSelected && straightMode) {
+      (w.waypoints || []).forEach((wp, idx) => {
+        const handle = svgEl('rect', { class: 'waypoint', x: wp.x - 5, y: wp.y - 5, width: 10, height: 10, rx: 2, ry: 2 });
+        handle.addEventListener('mousedown', (e) => onWaypointDown(e, w, idx));
+        viewport.appendChild(handle);
+      });
     }
   }
 
@@ -821,7 +1261,7 @@ function _render() {
     if (src) {
       const a = pinPos(src, pendingWire.from.side, pendingWire.from.pin);
       const b = pendingWire.mouse;
-      viewport.appendChild(svgEl('path', { d: bezier(a, b), class: 'wire pending' }));
+      viewport.appendChild(svgEl('path', { d: wirePath(a, b, null), class: 'wire pending' }));
     }
   }
 
@@ -842,19 +1282,98 @@ function bezier(a, b) {
   return 'M ' + a.x + ' ' + a.y + ' C ' + (a.x + dx) + ' ' + a.y + ', ' + (b.x - dx) + ' ' + b.y + ', ' + b.x + ' ' + b.y;
 }
 
+/**
+ * Build the SVG path 'd' attribute for a wire. Curved mode uses a single
+ * bezier; straight mode draws a polyline that passes through every waypoint
+ * (or a default L-route between the endpoints if none).
+ */
+function wirePath(a, b, wire) {
+  if (routingStyle() === 'curved') return bezier(a, b);
+  const wps = (wire && wire.waypoints) || [];
+  if (!wps.length) {
+    // Default Manhattan-style Z route: out → mid-x at a.y → mid-x at b.y → in.
+    const mx = (a.x + b.x) / 2;
+    return 'M ' + a.x + ' ' + a.y + ' L ' + mx + ' ' + a.y + ' L ' + mx + ' ' + b.y + ' L ' + b.x + ' ' + b.y;
+  }
+  const parts = ['M ' + a.x + ' ' + a.y];
+  for (const wp of wps) parts.push('L ' + wp.x + ' ' + wp.y);
+  parts.push('L ' + b.x + ' ' + b.y);
+  return parts.join(' ');
+}
+
+/** Distance from a point to the line segment a-b. */
+function distToSegment(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+/**
+ * Insert a new routing waypoint at \`pt\` into wire \`w\`. The insertion index
+ * is chosen so the click point lands on the polyline segment it's closest to,
+ * which keeps the wire visually unchanged at the moment of insert.
+ */
+function insertWaypoint(w, pt) {
+  const src = doc.nodes.find((n) => n.id === w.from.id);
+  const dst = doc.nodes.find((n) => n.id === w.to.id);
+  if (!src || !dst) return;
+  const a = pinPos(src, w.from.side, w.from.pin);
+  const b = pinPos(dst, w.to.side, w.to.pin);
+  const wps = (w.waypoints || []).slice();
+  const pts = [a, ...wps, b];
+  let bestIdx = 0, bestDist = Infinity;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const d = distToSegment(pt, pts[i], pts[i + 1]);
+    if (d < bestDist) { bestDist = d; bestIdx = i; }
+  }
+  pushHistory();
+  wps.splice(bestIdx, 0, { x: pt.x, y: pt.y });
+  w.waypoints = wps;
+  setDirty(true);
+  render();
+}
+
+function onWaypointDown(e, wire, idx) {
+  e.stopPropagation();
+  const wps = (wire.waypoints || []).slice();
+  if (!wps[idx]) return;
+  if (e.shiftKey) {
+    pushHistory();
+    wps.splice(idx, 1);
+    wire.waypoints = wps.length ? wps : undefined;
+    setDirty(true);
+    render();
+    return;
+  }
+  const pt = clientToContent(e);
+  draggingWaypoint = {
+    wire,
+    idx,
+    dx: pt.x - wps[idx].x,
+    dy: pt.y - wps[idx].y,
+    moved: false,
+    pre: snapshot(),
+  };
+}
+
 function renderNode(n, lod) {
   const s = shapeOf(n);
   const isModule = n.type === 'MODULE';
   const gateUri = !isModule && GATE_URIS[n.type];
+  const hasColor = !!n.color;
   const g = svgEl('g', {
-    class: 'node' + (selectedNodes.has(n.id) ? ' selected' : '') + (isModule ? ' module' : ''),
+    class: 'node' + (selectedNodes.has(n.id) ? ' selected' : '') + (isModule ? ' module' : '') + (hasColor ? ' has-color' : ''),
     transform: 'translate(' + n.x + ',' + n.y + ')',
   });
+  if (hasColor) g.style.setProperty('--node-color', n.color);
 
   if (gateUri) {
     // SVG icon fills the node bounds; stubs in the SVG reach x=0 (left) and
     // x=100→s.w (right), so wire endpoints land exactly on the pin circles.
     g.appendChild(svgEl('image', { href: gateUri, x: 0, y: 0, width: s.w, height: s.h, preserveAspectRatio: 'none' }));
+    g.appendChild(svgEl('rect', { class: 'node-tint', x: 0, y: 0, width: s.w, height: s.h, rx: 3, ry: 3 }));
     // Transparent rect provides the selection stroke and a reliable hit target.
     g.appendChild(svgEl('rect', { class: 'hit', x: 0, y: 0, width: s.w, height: s.h, rx: 3, ry: 3 }));
   } else {
@@ -943,6 +1462,7 @@ function onNodeDown(e, n) {
     selectedNodes.add(n.id);
   }
   selectedWire = null;
+  syncColorPickerToSelection();
 
   // Drag all currently-selected nodes as a group. We capture per-node deltas
   // so members keep their relative positions during the drag.
@@ -984,6 +1504,18 @@ svg.addEventListener('mousemove', (e) => {
     applyView();
     return;
   }
+  if (draggingWaypoint) {
+    const pt = clientToContent(e);
+    const wps = draggingWaypoint.wire.waypoints || [];
+    const wp = wps[draggingWaypoint.idx];
+    if (wp) {
+      wp.x = pt.x - draggingWaypoint.dx;
+      wp.y = pt.y - draggingWaypoint.dy;
+      draggingWaypoint.moved = true;
+      render();
+    }
+    return;
+  }
   if (dragging) {
     const pt = clientToContent(e);
     dragging.moved = true;
@@ -1015,6 +1547,15 @@ window.addEventListener('mouseup', () => {
     }
     dragging = null;
   }
+  if (draggingWaypoint) {
+    if (draggingWaypoint.moved) {
+      history.push(draggingWaypoint.pre);
+      if (history.length > HISTORY_LIMIT) history.shift();
+      future.length = 0;
+      setDirty(true);
+    }
+    draggingWaypoint = null;
+  }
   if (rubber) {
     finalizeRubber();
     rubber = null;
@@ -1031,6 +1572,7 @@ function finalizeRubber() {
     const hit = !(n.x + s.w < x || n.x > x2 || n.y + s.h < y || n.y > y2);
     if (hit) selectedNodes.add(n.id);
   }
+  syncColorPickerToSelection();
 }
 
 svg.addEventListener('mousedown', (e) => {
@@ -1045,6 +1587,7 @@ svg.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;
   pendingWire = null;
   if (!e.shiftKey) { selectedNodes.clear(); selectedWire = null; }
+  syncColorPickerToSelection();
   const pt = clientToContent(e);
   rubber = { x0: pt.x, y0: pt.y, x1: pt.x, y1: pt.y };
   render();
@@ -1078,6 +1621,7 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     selectedNodes = new Set(doc.nodes.map((n) => n.id));
     selectedWire = null;
+    syncColorPickerToSelection();
     render();
     return;
   }
@@ -1094,6 +1638,7 @@ window.addEventListener('keydown', (e) => {
       doc.wires = doc.wires.filter((w) => w !== selectedWire);
       selectedWire = null;
     }
+    syncColorPickerToSelection();
     setDirty(true);
     render();
   }
@@ -1118,20 +1663,28 @@ function copySelection() {
 function pasteClipboard() {
   if (!clipboard || !clipboard.nodes.length) return;
   pushHistory();
+  const OFFSET = 24;
   const idMap = new Map();
   const newNodes = clipboard.nodes.map((n) => {
     const fresh = freshId();
     idMap.set(n.id, fresh);
-    return Object.assign({}, n, { id: fresh, x: n.x + 24, y: n.y + 24, label: n.label });
+    return Object.assign({}, n, { id: fresh, x: n.x + OFFSET, y: n.y + OFFSET, label: n.label });
   });
-  const newWires = clipboard.wires.map((w) => ({
-    from: { id: idMap.get(w.from.id), pin: w.from.pin, side: w.from.side },
-    to:   { id: idMap.get(w.to.id),   pin: w.to.pin,   side: w.to.side },
-  }));
+  const newWires = clipboard.wires.map((w) => {
+    const waypoints = (w.waypoints || []).map((wp) => ({ x: wp.x + OFFSET, y: wp.y + OFFSET }));
+    const out = {
+      from: { id: idMap.get(w.from.id), pin: w.from.pin, side: w.from.side },
+      to:   { id: idMap.get(w.to.id),   pin: w.to.pin,   side: w.to.side },
+    };
+    if (w.color) out.color = w.color;
+    if (waypoints.length) out.waypoints = waypoints;
+    return out;
+  });
   doc.nodes.push(...newNodes);
   doc.wires.push(...newWires);
   selectedNodes = new Set(newNodes.map((n) => n.id));
   selectedWire = null;
+  syncColorPickerToSelection();
   setDirty(true);
   render();
 }
@@ -1166,6 +1719,9 @@ document.getElementById('btnImportModule').addEventListener('click', () => {
   // Host needs our own moduleName so it can refuse cycles up front.
   vscode.postMessage({ type: 'importModule', ownName: doc.moduleName });
 });
+document.getElementById('btnImportHdl').addEventListener('click', () => {
+  vscode.postMessage({ type: 'importHdlModule', ownName: doc.moduleName });
+});
 document.getElementById('btnReloadModules').addEventListener('click', () => {
   const list = Object.entries(doc.modules || {})
     .filter(([, iface]) => !!iface.file)
@@ -1191,6 +1747,7 @@ svg.addEventListener('drop', (e) => {
   doc.nodes.push(node);
   selectedNodes = new Set([node.id]);
   selectedWire = null;
+  syncColorPickerToSelection();
   setDirty(true);
   render();
 });
@@ -1199,7 +1756,7 @@ svg.addEventListener('drop', (e) => {
 moduleNameInput.addEventListener('input', () => { doc.moduleName = moduleNameInput.value || 'circuit'; setDirty(true); });
 document.getElementById('btnNew').addEventListener('click', () => {
   if (dirty && !confirm('Discard unsaved changes?')) return;
-  doc = { moduleName: 'circuit', nodes: [], wires: [], modules: {} };
+  doc = { moduleName: 'circuit', nodes: [], wires: [], modules: {}, routingStyle: 'curved' };
   nextId = 1; selectedNodes.clear(); selectedWire = null; pendingWire = null;
   history.length = 0; future.length = 0;
   view = { tx: 0, ty: 0, scale: 1 }; applyView();
@@ -1207,14 +1764,33 @@ document.getElementById('btnNew').addEventListener('click', () => {
   footer.textContent = 'Untitled';
   rebuildModulePalette();
   setDirty(false);
+  updateRoutingButton();
+  syncColorPickerToSelection();
   render();
 });
 document.getElementById('btnOpen').addEventListener('click', () => vscode.postMessage({ type: 'open' }));
 document.getElementById('btnSave').addEventListener('click', () => vscode.postMessage({ type: 'save', payload: doc }));
 document.getElementById('btnSaveAs').addEventListener('click', () => vscode.postMessage({ type: 'save', payload: doc, asNew: true }));
-document.getElementById('btnExport').addEventListener('click', () => vscode.postMessage({ type: 'exportVerilog', payload: doc }));
+document.getElementById('btnExport').addEventListener('click', () => vscode.postMessage({ type: 'exportHdl', payload: doc }));
 document.getElementById('btnUndo').addEventListener('click', undo);
 document.getElementById('btnRedo').addEventListener('click', redo);
+btnRouting.addEventListener('click', () => {
+  pushHistory();
+  doc.routingStyle = routingStyle() === 'curved' ? 'straight' : 'curved';
+  setDirty(true);
+  updateRoutingButton();
+  render();
+});
+colorPicker.addEventListener('input', () => {
+  if (!selectedWire && !selectedNodes.size) return;
+  applySelectionColor(colorPicker.value);
+  syncColorPickerToSelection();
+});
+btnClearColor.addEventListener('click', () => {
+  if (!selectedWire && !selectedNodes.size) return;
+  clearSelectionColor();
+  syncColorPickerToSelection();
+});
 
 // ----- Host messages --------------------------------------------------------
 window.addEventListener('message', (event) => {
@@ -1222,6 +1798,7 @@ window.addEventListener('message', (event) => {
   if (msg.type === 'loaded') {
     doc = msg.payload || { moduleName: 'circuit', nodes: [], wires: [], modules: {} };
     if (!doc.modules) doc.modules = {};
+    if (!doc.routingStyle) doc.routingStyle = 'curved';
     let maxN = 0;
     for (const n of doc.nodes) { const m = /^n(\\d+)$/.exec(n.id); if (m) maxN = Math.max(maxN, parseInt(m[1], 10)); }
     nextId = maxN + 1;
@@ -1232,6 +1809,8 @@ window.addEventListener('message', (event) => {
     view = { tx: 0, ty: 0, scale: 1 }; applyView();
     rebuildModulePalette();
     setDirty(false);
+    updateRoutingButton();
+    syncColorPickerToSelection();
     render();
   } else if (msg.type === 'saved') {
     footer.textContent = msg.path; setDirty(false); status.textContent = 'Saved';
@@ -1267,5 +1846,7 @@ window.addEventListener('message', (event) => {
 });
 
 applyView();
+updateRoutingButton();
+syncColorPickerToSelection();
 render();
 `;

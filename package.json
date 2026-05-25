@@ -169,14 +169,24 @@
     "menus": {
       "view/title": [
         {
+          "command": "bitstream.buildBitstream",
+          "when": "view == bitstream.projectExplorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "bitstream.uploadBitstream",
+          "when": "view == bitstream.projectExplorer",
+          "group": "navigation@2"
+        },
+        {
           "command": "bitstream.refreshExplorer",
           "when": "view == bitstream.projectExplorer",
-          "group": "navigation"
+          "group": "navigation@3"
         },
         {
           "command": "bitstream.newProject",
           "when": "view == bitstream.projectExplorer",
-          "group": "navigation"
+          "group": "navigation@4"
         },
         {
           "command": "bitstream.openSettings",

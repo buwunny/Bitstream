@@ -160,6 +160,76 @@ export function parseVerilogText(src: string, relPath: string): ModuleDecl[] {
     return out;
 }
 
+/**
+ * Strip VHDL `--` line comments. Block comments aren't standard VHDL so we
+ * don't bother. Newlines are preserved.
+ */
+function stripVhdlComments(src: string): string {
+    return src.replace(/--[^\n]*/g, "");
+}
+
+/**
+ * Lift VHDL port directions/types to the same `ModulePort` shape used by the
+ * Verilog parser. Supports `std_logic`, `std_ulogic`, `std_logic_vector`,
+ * `std_ulogic_vector`, `signed`, `unsigned`, and `bit`/`bit_vector` with
+ * `(hi downto lo)` or `(lo to hi)` ranges. Anything else falls back to width 1.
+ */
+function parseVhdlPortLine(line: string): ModulePort[] {
+    // VHDL allows `a, b, c : in std_logic_vector(7 downto 0);` — a single
+    // declaration can name several ports of identical direction and type.
+    const m = /^([\w\s,]+):\s*(in|out|inout|buffer)\s+([\s\S]+)$/i.exec(line.trim().replace(/;$/, ""));
+    if (!m) { return []; }
+    const names = m[1].split(",").map((s) => s.trim()).filter(Boolean);
+    const dir = m[2].toLowerCase() as "in" | "out" | "inout" | "buffer";
+    const typeStr = m[3].trim();
+
+    let width = 1;
+    const rangeM = /\(\s*(\d+)\s+(downto|to)\s+(\d+)\s*\)/i.exec(typeStr);
+    if (rangeM) {
+        const a = parseInt(rangeM[1], 10), b = parseInt(rangeM[3], 10);
+        width = Math.abs(a - b) + 1;
+    }
+
+    const direction: PortDirection =
+        dir === "out" || dir === "buffer" ? "output" :
+        dir === "inout" ? "inout" : "input";
+    return names.map((name) => ({ name, direction, width }));
+}
+
+/**
+ * Pull every `entity NAME is ... end entity NAME;` block out of a VHDL file.
+ * Architectures aren't parsed — we only need the entity port list to wire the
+ * imported component into the circuit editor.
+ */
+export function parseVhdlText(src: string, relPath: string): ModuleDecl[] {
+    const text = stripVhdlComments(src);
+    const out: ModuleDecl[] = [];
+    const re = /\bentity\s+([A-Za-z_]\w*)\s+is\s+([\s\S]*?)\bend\s+(?:entity\s+)?(?:\1\s*)?;/gi;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+        const name = m[1];
+        const body = m[2];
+        // Extract the `port ( ... );` block. Generics live alongside; we ignore them.
+        const portM = /\bport\s*\(([\s\S]*?)\)\s*;/i.exec(body);
+        const ports: ModulePort[] = [];
+        if (portM) {
+            // Split on `;` at paren-depth 0 so `vector(7 downto 0)` stays intact.
+            const items: string[] = [];
+            let depth = 0, current = "";
+            for (const ch of portM[1]) {
+                if (ch === "(") { depth++; current += ch; continue; }
+                if (ch === ")") { depth--; current += ch; continue; }
+                if (ch === ";" && depth === 0) { items.push(current); current = ""; continue; }
+                current += ch;
+            }
+            if (current.trim()) { items.push(current); }
+            for (const item of items) { ports.push(...parseVhdlPortLine(item)); }
+        }
+        out.push({ name, file: relPath, ports, instances: [] });
+    }
+    return out;
+}
+
 /** Parse every source file in the manifest and return a flat module list. */
 export function parseWorkspaceModules(workspaceRoot: string, sourceFiles: string[]): ModuleDecl[] {
     const out: ModuleDecl[] = [];

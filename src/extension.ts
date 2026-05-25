@@ -10,8 +10,8 @@
  *   • FileSystemWatcher       — keeps `bitstream.json` in sync with `*.v`,
  *                                `*.sv`, `*.vhd` files that appear or vanish
  *                                from the workspace.
- *   • Status Bar items        — clickable "🔨 Build Bitstream" /
- *                                "⚡ Upload to Board" shortcuts.
+ *   • Status Bar items        — clickable "Build Bitstream" /
+ *                                "Upload to Board" shortcuts.
  *
  * Lifecycle: VS Code calls `activate(context)` once. Everything that owns OS
  * resources (LSP client, watcher, linter, status bar) is pushed onto
@@ -414,26 +414,27 @@ function arraysEqual(a: string[], b: string[]): boolean {
 }
 
 /**
- * Two right-aligned status bar items. We register them once per session
+ * Three left-aligned status bar items. We register them once per session
  * and let users click them rather than memorising command-palette names.
+ * Higher priority renders further left within the Left group.
  */
 function registerStatusBar(context: vscode.ExtensionContext): void {
     if (buildStatus || uploadStatus) { return; }
-    buildStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-    buildStatus.text = "$(tools) 🔨 Build Bitstream";
+    buildStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    buildStatus.text = "$(tools) Build Bitstream";
     buildStatus.tooltip = "Synthesize and write a bitstream for the current Bitstream project.";
     buildStatus.command = "bitstream.buildBitstream";
     buildStatus.show();
 
-    uploadStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
-    uploadStatus.text = "$(zap) ⚡ Upload to Board";
+    uploadStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
+    uploadStatus.text = "$(zap) Upload to Board";
     uploadStatus.tooltip = "Program the connected FPGA over JTAG.";
     uploadStatus.command = "bitstream.uploadBitstream";
     uploadStatus.show();
 
     // Always-visible top-module indicator — click to switch tops without
     // hunting through the command palette.
-    topModuleStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 101);
+    topModuleStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 101);
     topModuleStatus.command = "bitstream.setTopModule";
     topModuleStatus.tooltip = "Click to choose the project's top module.";
     topModuleStatus.show();
