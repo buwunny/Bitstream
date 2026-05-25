@@ -1,0 +1,269 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "VHDL",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#characters" },
+    { "include": "#bit-string-literals" },
+    { "include": "#entity-decl" },
+    { "include": "#architecture-decl" },
+    { "include": "#package-decl" },
+    { "include": "#component-decl" },
+    { "include": "#library-use" },
+    { "include": "#attributes" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#operators" },
+    { "include": "#types" },
+    { "include": "#functions" },
+    { "include": "#identifiers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-dash.vhdl",
+          "begin": "--",
+          "end": "$",
+          "patterns": [
+            { "name": "keyword.other.todo.vhdl", "match": "\\b(TODO|FIXME|XXX|HACK|NOTE)\\b" }
+          ]
+        },
+        {
+          "name": "comment.block.vhdl",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "patterns": [
+            { "name": "keyword.other.todo.vhdl", "match": "\\b(TODO|FIXME|XXX|HACK|NOTE)\\b" }
+          ]
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.vhdl",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            { "name": "constant.character.escape.vhdl", "match": "\"\"" }
+          ]
+        }
+      ]
+    },
+    "characters": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.vhdl",
+          "match": "'[01XZUWLH\\-]'"
+        },
+        {
+          "name": "string.quoted.single.vhdl",
+          "match": "'[^']'"
+        }
+      ]
+    },
+    "bit-string-literals": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.vhdl",
+          "match": "(?i)\\b(\\d+)?x\"[0-9a-fA-F_]+\""
+        },
+        {
+          "name": "constant.numeric.binary.vhdl",
+          "match": "(?i)\\b(\\d+)?b\"[01_]+\""
+        },
+        {
+          "name": "constant.numeric.octal.vhdl",
+          "match": "(?i)\\b(\\d+)?o\"[0-7_]+\""
+        },
+        {
+          "name": "constant.numeric.unsigned.vhdl",
+          "match": "(?i)\\b(\\d+)?u[bxod]\"[0-9a-fA-F_]+\""
+        },
+        {
+          "name": "constant.numeric.signed.vhdl",
+          "match": "(?i)\\b(\\d+)?s[bxod]\"[0-9a-fA-F_]+\""
+        }
+      ]
+    },
+    "entity-decl": {
+      "patterns": [
+        {
+          "match": "(?i)\\b(entity)\\s+([a-zA-Z]\\w*)\\s+(is)\\b",
+          "captures": {
+            "1": { "name": "keyword.declaration.entity.vhdl" },
+            "2": { "name": "entity.name.type.entity.vhdl" },
+            "3": { "name": "keyword.control.vhdl" }
+          }
+        },
+        {
+          "match": "(?i)\\b(end)\\s+(entity)\\s+([a-zA-Z]\\w*)",
+          "captures": {
+            "1": { "name": "keyword.control.vhdl" },
+            "2": { "name": "keyword.declaration.entity.vhdl" },
+            "3": { "name": "entity.name.type.entity.vhdl" }
+          }
+        }
+      ]
+    },
+    "architecture-decl": {
+      "patterns": [
+        {
+          "match": "(?i)\\b(architecture)\\s+([a-zA-Z]\\w*)\\s+(of)\\s+([a-zA-Z]\\w*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.architecture.vhdl" },
+            "2": { "name": "entity.name.type.architecture.vhdl" },
+            "3": { "name": "keyword.control.vhdl" },
+            "4": { "name": "entity.name.type.entity.vhdl" }
+          }
+        }
+      ]
+    },
+    "package-decl": {
+      "patterns": [
+        {
+          "match": "(?i)\\b(package)(?:\\s+(body))?\\s+([a-zA-Z]\\w*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.package.vhdl" },
+            "2": { "name": "keyword.declaration.package.vhdl" },
+            "3": { "name": "entity.name.type.package.vhdl" }
+          }
+        }
+      ]
+    },
+    "component-decl": {
+      "patterns": [
+        {
+          "match": "(?i)\\b(component)\\s+([a-zA-Z]\\w*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.component.vhdl" },
+            "2": { "name": "entity.name.type.component.vhdl" }
+          }
+        }
+      ]
+    },
+    "library-use": {
+      "patterns": [
+        {
+          "match": "(?i)\\b(library)\\s+([a-zA-Z]\\w*(?:\\s*,\\s*[a-zA-Z]\\w*)*)",
+          "captures": {
+            "1": { "name": "keyword.control.import.vhdl" },
+            "2": { "name": "entity.name.namespace.vhdl" }
+          }
+        },
+        {
+          "match": "(?i)\\b(use)\\s+([a-zA-Z]\\w*(?:\\.[a-zA-Z_]\\w*|\\.all)*)",
+          "captures": {
+            "1": { "name": "keyword.control.import.vhdl" },
+            "2": { "name": "entity.name.namespace.vhdl" }
+          }
+        }
+      ]
+    },
+    "attributes": {
+      "patterns": [
+        {
+          "name": "support.other.attribute.vhdl",
+          "match": "(?i)'(event|active|last_event|last_active|last_value|stable|quiet|delayed|transaction|high|low|left|right|range|reverse_range|length|ascending|descending|image|value|pos|val|succ|pred|leftof|rightof|base|driving|driving_value|simple_name|instance_name|path_name)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.real.vhdl",
+          "match": "\\b\\d[\\d_]*\\.\\d[\\d_]*([eE][+-]?\\d+)?\\b"
+        },
+        {
+          "name": "constant.numeric.based.vhdl",
+          "match": "\\b\\d+#[0-9a-fA-F_]+(\\.[0-9a-fA-F_]+)?#([eE][+-]?\\d+)?"
+        },
+        {
+          "name": "constant.numeric.decimal.vhdl",
+          "match": "\\b\\d[\\d_]*([eE][+-]?\\d+)?\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.declaration.vhdl",
+          "match": "(?i)\\b(entity|architecture|configuration|package|library|use|component|signal|variable|constant|generic|port|type|subtype|alias|attribute|procedure|function|impure|pure|process|file|group|shared|disconnect|guarded|register|bus)\\b"
+        },
+        {
+          "name": "keyword.control.vhdl",
+          "match": "(?i)\\b(if|then|else|elsif|case|when|others|loop|while|for|until|exit|next|wait|process|begin|end|is|renames|select|with|return|new|generate|block|map|of|in|is|assert|report|severity|note|warning|error|failure)\\b"
+        },
+        {
+          "name": "storage.modifier.vhdl",
+          "match": "(?i)\\b(in|out|inout|buffer|linkage|register|bus|shared|access|protected|body)\\b"
+        },
+        {
+          "name": "keyword.other.vhdl",
+          "match": "(?i)\\b(all|open|range|downto|to|transport|inertial|reject|after|nonnull|defer|concurrent|unaffected|on|postponed|label|literal|units|null)\\b"
+        },
+        {
+          "name": "constant.language.vhdl",
+          "match": "(?i)\\b(true|false|null)\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.word.vhdl",
+          "match": "(?i)\\b(and|or|nand|nor|xor|xnor|not|mod|rem|abs|rol|ror|sll|srl|sla|sra)\\b"
+        },
+        {
+          "name": "keyword.operator.assignment.vhdl",
+          "match": "<=|:=|=>"
+        },
+        {
+          "name": "keyword.operator.comparison.vhdl",
+          "match": "/=|<=|>=|<|>|="
+        },
+        {
+          "name": "keyword.operator.arithmetic.vhdl",
+          "match": "\\*\\*|[+\\-*/&]"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.vhdl",
+          "match": "(?i)\\b(bit|bit_vector|boolean|character|integer|natural|positive|real|time|string|severity_level|file_open_kind|file_open_status|line|text)\\b"
+        },
+        {
+          "name": "storage.type.ieee.vhdl",
+          "match": "(?i)\\b(std_logic|std_logic_vector|std_ulogic|std_ulogic_vector|unsigned|signed|signed_fixed|ufixed|sfixed|float|signed_integer|unsigned_integer)\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "support.function.ieee.vhdl",
+          "match": "(?i)\\b(to_integer|to_unsigned|to_signed|to_stdlogicvector|to_std_logic_vector|to_stdulogicvector|to_std_ulogic_vector|to_bit|to_bitvector|to_x01|to_x01z|to_ux01|conv_integer|conv_signed|conv_unsigned|conv_std_logic_vector|resize|shift_left|shift_right|rotate_left|rotate_right|rising_edge|falling_edge|is_x|now)\\b"
+        },
+        {
+          "match": "([a-zA-Z]\\w*)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "entity.name.function.vhdl" }
+          }
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "variable.other.vhdl",
+          "match": "\\b[a-zA-Z][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    }
+  },
+  "scopeName": "source.vhdl"
+}

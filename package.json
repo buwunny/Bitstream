@@ -1,0 +1,271 @@
+{
+  "name": "bitstream",
+  "displayName": "Bitstream",
+  "description": "Unified, git-friendly FPGA development toolchain for Xilinx Vivado and Intel Quartus. Headless CLI/Tcl automation, LSP-powered IntelliSense, Verilator linting.",
+  "version": "0.1.0",
+  "publisher": "bitstream",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "fpga",
+    "verilog",
+    "systemverilog",
+    "vhdl",
+    "vivado",
+    "quartus",
+    "xilinx",
+    "intel"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "workspaceContains:bitstream.json",
+    "onLanguage:verilog",
+    "onLanguage:systemverilog",
+    "onLanguage:vhdl"
+  ],
+  "contributes": {
+    "grammars": [
+      {
+        "language": "verilog",
+        "scopeName": "source.verilog",
+        "path": "./syntaxes/verilog.tmLanguage.json"
+      },
+      {
+        "language": "systemverilog",
+        "scopeName": "source.systemverilog",
+        "path": "./syntaxes/systemverilog.tmLanguage.json"
+      },
+      {
+        "language": "vhdl",
+        "scopeName": "source.vhdl",
+        "path": "./syntaxes/vhdl.tmLanguage.json"
+      }
+    ],
+    "languages": [
+      {
+        "id": "verilog",
+        "aliases": [
+          "Verilog",
+          "verilog"
+        ],
+        "extensions": [
+          ".v",
+          ".vh"
+        ]
+      },
+      {
+        "id": "systemverilog",
+        "aliases": [
+          "SystemVerilog",
+          "systemverilog"
+        ],
+        "extensions": [
+          ".sv",
+          ".svh"
+        ]
+      },
+      {
+        "id": "vhdl",
+        "aliases": [
+          "VHDL",
+          "vhdl"
+        ],
+        "extensions": [
+          ".vhd",
+          ".vhdl"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "bitstream.newProject",
+        "title": "Bitstream: New Project Wizard"
+      },
+      {
+        "command": "bitstream.syncManifest",
+        "title": "Bitstream: Sync Source Files into bitstream.json"
+      },
+      {
+        "command": "bitstream.regenerateGitignore",
+        "title": "Bitstream: Regenerate .gitignore"
+      },
+      {
+        "command": "bitstream.buildBitstream",
+        "title": "Bitstream: Build Bitstream",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "bitstream.uploadBitstream",
+        "title": "Bitstream: Upload to Board",
+        "icon": "$(zap)"
+      },
+      {
+        "command": "bitstream.lintActive",
+        "title": "Bitstream: Lint Active File (Verilator)"
+      },
+      {
+        "command": "bitstream.newCircuit",
+        "title": "Bitstream: New Circuit Editor"
+      },
+      {
+        "command": "bitstream.openCircuit",
+        "title": "Bitstream: Open Circuit File…"
+      },
+      {
+        "command": "bitstream.setTopModule",
+        "title": "Bitstream: Set Top Module…",
+        "icon": "$(symbol-class)"
+      },
+      {
+        "command": "bitstream.openPinPlanner",
+        "title": "Bitstream: Open Pin Planner"
+      },
+      {
+        "command": "bitstream.runSimulation",
+        "title": "Bitstream: Run Simulation",
+        "icon": "$(play)"
+      },
+      {
+        "command": "bitstream.openTclConsole",
+        "title": "Bitstream: Open Tcl Console"
+      },
+      {
+        "command": "bitstream.refreshExplorer",
+        "title": "Bitstream: Refresh Project Explorer",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "bitstream.openSettings",
+        "title": "Bitstream: Open Extension Settings",
+        "icon": "$(gear)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "bitstream",
+          "title": "Bitstream",
+          "icon": "$(circuit-board)"
+        }
+      ]
+    },
+    "views": {
+      "bitstream": [
+        {
+          "id": "bitstream.projectExplorer",
+          "name": "Project",
+          "icon": "$(circuit-board)",
+          "contextualTitle": "Bitstream Project"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "bitstream.refreshExplorer",
+          "when": "view == bitstream.projectExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "bitstream.newProject",
+          "when": "view == bitstream.projectExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "bitstream.openSettings",
+          "when": "view == bitstream.projectExplorer",
+          "group": "navigation@99"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "bitstream.setTopModule",
+          "when": "view == bitstream.projectExplorer && viewItem == hierarchy",
+          "group": "1_top@1"
+        },
+        {
+          "command": "bitstream.runSimulation",
+          "when": "view == bitstream.projectExplorer && viewItem == testbench",
+          "group": "1_run@1"
+        },
+        {
+          "command": "bitstream.openPinPlanner",
+          "when": "view == bitstream.projectExplorer && viewItem == project",
+          "group": "2_tools@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Bitstream",
+      "properties": {
+        "hdlToolchain.vivadoPath": {
+          "type": "string",
+          "default": "vivado",
+          "description": "Absolute path to the Vivado executable. If left as 'vivado', the system PATH is used."
+        },
+        "hdlToolchain.quartusPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the Quartus install bin directory (containing quartus_map, quartus_fit, quartus_asm, quartus_pgm). Empty means use system PATH."
+        },
+        "hdlToolchain.veribleLsPath": {
+          "type": "string",
+          "default": "verible-verilog-ls",
+          "description": "Path to the verible-verilog-ls language server binary."
+        },
+        "hdlToolchain.enableLsp": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start the Verible language server for Verilog/SystemVerilog IntelliSense. Disable if you use a different LSP or are seeing repeated connection errors."
+        },
+        "hdlToolchain.verilatorPath": {
+          "type": "string",
+          "default": "verilator",
+          "description": "Path to the verilator binary used for on-save linting."
+        },
+        "hdlToolchain.lintOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run verilator --lint-only whenever a Verilog/SystemVerilog file is saved."
+        },
+        "hdlToolchain.iverilogPath": {
+          "type": "string",
+          "default": "iverilog",
+          "description": "Path to the Icarus Verilog compiler (iverilog) used by the simulation runner."
+        },
+        "hdlToolchain.vvpPath": {
+          "type": "string",
+          "default": "vvp",
+          "description": "Path to the Icarus Verilog vvp runtime used to execute the compiled simulation image."
+        },
+        "hdlToolchain.gtkwavePath": {
+          "type": "string",
+          "default": "gtkwave",
+          "description": "Path to GTKWave, used to open waveforms (VCD/FST) produced by simulation runs."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "dependencies": {
+    "@vscode-elements/elements": "^2.5.1",
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.3"
+  }
+}
