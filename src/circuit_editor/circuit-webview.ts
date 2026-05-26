@@ -128,8 +128,13 @@ function setDirty(v) {
   if (v) scheduleDocSync();
 }
 function routingStyle() { return doc.routingStyle || 'curved'; }
+// Both straight and manhattan modes share the orthogonal interaction model:
+// click-to-add-waypoint while drawing, dblclick to insert, waypoint handles
+// on selected wires. Curved mode opts out of all of that.
+function orthogonalMode() { const s = routingStyle(); return s === 'straight' || s === 'manhattan'; }
+const ROUTING_LABELS = { curved: 'curved', straight: 'straight', manhattan: 'right-angle' };
 function updateRoutingButton() {
-  btnRouting.textContent = 'Wires: ' + routingStyle();
+  btnRouting.textContent = 'Wires: ' + (ROUTING_LABELS[routingStyle()] || routingStyle());
 }
 function isHexColor(v) {
   return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v || '');
@@ -329,7 +334,7 @@ function _render() {
   // Wires first so node bodies overlay endpoints. A wire is drawn unless
   // *both* endpoints are culled — otherwise it'd disappear when one end is
   // pulled off-screen during a drag.
-  const straightMode = routingStyle() === 'straight';
+  const straightMode = orthogonalMode();
   for (const w of doc.wires) {
     if (culled.has(w.from.id) && culled.has(w.to.id)) continue;
     const src = doc.nodes.find((n) => n.id === w.from.id);
@@ -360,13 +365,37 @@ function _render() {
       viewport.appendChild(tag);
     }
     // Waypoint handles render only for the selected wire in straight mode —
-    // keeps the canvas quiet when the user isn't routing.
+    // keeps the canvas quiet when the user isn't routing. For wires with no
+    // explicit waypoints, expose the two implicit Z-route corners as ghost
+    // handles so the user can grab and reshape the default route without
+    // having to dbl-click first.
     if (isSelected && straightMode) {
-      (w.waypoints || []).forEach((wp, idx) => {
-        const handle = svgEl('rect', { class: 'waypoint', x: wp.x - 5, y: wp.y - 5, width: 10, height: 10, rx: 2, ry: 2 });
-        handle.addEventListener('mousedown', (e) => onWaypointDown(e, w, idx));
-        viewport.appendChild(handle);
-      });
+      const wps = w.waypoints || [];
+      if (wps.length) {
+        wps.forEach((wp, idx) => {
+          const handle = svgEl('rect', { class: 'waypoint', x: wp.x - 5, y: wp.y - 5, width: 10, height: 10, rx: 2, ry: 2 });
+          handle.addEventListener('mousedown', (e) => onWaypointDown(e, w, idx));
+          viewport.appendChild(handle);
+        });
+        // Ghost handles on the renderer-inserted L-corners (manhattan only).
+        // First drag promotes the corner into a real waypoint at the right
+        // index — same materialize-on-move pattern as the empty-wire joints.
+        if (routingStyle() === 'manhattan') {
+          const ghosts = manhattanGhostCorners(a, b, wps);
+          ghosts.forEach((g) => {
+            const handle = svgEl('rect', { class: 'waypoint ghost', x: g.pos.x - 5, y: g.pos.y - 5, width: 10, height: 10, rx: 2, ry: 2 });
+            handle.addEventListener('mousedown', (e) => onImplicitCornerDown(e, w, g.insertAt, g.pos));
+            viewport.appendChild(handle);
+          });
+        }
+      } else {
+        const joints = defaultZJoints(a, b);
+        joints.forEach((wp, idx) => {
+          const handle = svgEl('rect', { class: 'waypoint ghost', x: wp.x - 5, y: wp.y - 5, width: 10, height: 10, rx: 2, ry: 2 });
+          handle.addEventListener('mousedown', (e) => onImplicitJointDown(e, w, idx, joints));
+          viewport.appendChild(handle);
+        });
+      }
     }
   }
 
@@ -404,6 +433,30 @@ function _render() {
     renderNode(n, lod);
   }
 
+  // Junction markers: a filled dot at any output pin that drives 2+ wires.
+  // This is the only kind of electrical connection between wires in our
+  // model — input pins enforce a single driver, so anywhere else two wire
+  // paths visually meet is a crossing, not a connection. Drawn after nodes
+  // so the dot sits on top of the pin circle.
+  const fanout = new Map();
+  for (const w of doc.wires) {
+    if (!w.from || w.from.side !== 'out') continue;
+    const key = w.from.id + ':' + w.from.pin;
+    fanout.set(key, (fanout.get(key) || 0) + 1);
+  }
+  for (const [key, count] of fanout) {
+    if (count < 2) continue;
+    const sep = key.indexOf(':');
+    const nodeId = key.slice(0, sep);
+    const pinIdx = parseInt(key.slice(sep + 1), 10);
+    if (culled.has(nodeId)) continue;
+    const node = doc.nodes.find((n) => n.id === nodeId);
+    if (!node) continue;
+    const p = pinPos(node, 'out', pinIdx);
+    const r = pinWidth(node, 'out', pinIdx) > 1 ? 4.5 : 3.5;
+    viewport.appendChild(svgEl('circle', { class: 'junction', cx: p.x, cy: p.y, r }));
+  }
+
   if (rubber) {
     const x = Math.min(rubber.x0, rubber.x1), y = Math.min(rubber.y0, rubber.y1);
     const w = Math.abs(rubber.x1 - rubber.x0), h = Math.abs(rubber.y1 - rubber.y0);
@@ -419,11 +472,14 @@ function bezier(a, b) {
 /**
  * Build the SVG path 'd' attribute for a wire. Curved mode uses a single
  * bezier; straight mode draws a polyline that passes through every waypoint
- * (or a default L-route between the endpoints if none).
+ * (or a default L-route between the endpoints if none); manhattan mode is
+ * straight + a guarantee that every rendered segment is axis-aligned.
  */
 function wirePath(a, b, wire) {
-  if (routingStyle() === 'curved') return bezier(a, b);
+  const style = routingStyle();
+  if (style === 'curved') return bezier(a, b);
   const wps = (wire && wire.waypoints) || [];
+  if (style === 'manhattan') return manhattanPath(a, b, wps);
   if (!wps.length) {
     // Default Manhattan-style Z route: out → mid-x at a.y → mid-x at b.y → in.
     const mx = (a.x + b.x) / 2;
@@ -433,6 +489,57 @@ function wirePath(a, b, wire) {
   for (const wp of wps) parts.push('L ' + wp.x + ' ' + wp.y);
   parts.push('L ' + b.x + ' ' + b.y);
   return parts.join(' ');
+}
+
+/**
+ * Manhattan route through (a, ...wps, b). Pins are on the left/right of nodes
+ * so the first and last segments must leave/enter horizontally — we achieve
+ * that by H-first L-routes everywhere except the final segment, which is
+ * V-first so it lands H into the destination pin. Already-aligned segments
+ * skip the corner entirely. The empty-waypoint case uses a Z-route (H-V-H)
+ * so both endpoints stay horizontal.
+ */
+function manhattanPath(a, b, wps) {
+  if (!wps.length) {
+    const mx = (a.x + b.x) / 2;
+    return 'M ' + a.x + ' ' + a.y + ' L ' + mx + ' ' + a.y + ' L ' + mx + ' ' + b.y + ' L ' + b.x + ' ' + b.y;
+  }
+  const pts = [a, ...wps, b];
+  const parts = ['M ' + pts[0].x + ' ' + pts[0].y];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p = pts[i], q = pts[i + 1];
+    if (p.x === q.x || p.y === q.y) {
+      parts.push('L ' + q.x + ' ' + q.y);
+      continue;
+    }
+    const isLast = i === pts.length - 2;
+    const corner = isLast ? { x: p.x, y: q.y } : { x: q.x, y: p.y };
+    parts.push('L ' + corner.x + ' ' + corner.y);
+    parts.push('L ' + q.x + ' ' + q.y);
+  }
+  return parts.join(' ');
+}
+
+/**
+ * Implicit L-corner positions inserted by manhattanPath for the given
+ * (a, ...wps, b) sequence. Each entry carries the wps-index where the
+ * corner should be spliced in if the user grabs and drags it. Mirrors the
+ * direction choice in manhattanPath exactly (H-first for all-but-last,
+ * V-first for the last) so handles render on the visible bends.
+ */
+function manhattanGhostCorners(a, b, wps) {
+  const pts = [a, ...wps, b];
+  const out = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p = pts[i], q = pts[i + 1];
+    if (p.x === q.x || p.y === q.y) continue;
+    const isLast = i === pts.length - 2;
+    const pos = isLast ? { x: p.x, y: q.y } : { x: q.x, y: p.y };
+    // Inserting at index i in wps places the new waypoint between pts[i]
+    // and pts[i+1] in the rendered sequence (since pts = [a, ...wps, b]).
+    out.push({ pos, insertAt: i });
+  }
+  return out;
 }
 
 /** Distance from a point to the line segment a-b. */
@@ -489,6 +596,56 @@ function onWaypointDown(e, wire, idx) {
     dy: pt.y - wps[idx].y,
     moved: false,
     pre: snapshot(),
+  };
+}
+
+/** The two implicit corners of the default Z-route between pins a and b. */
+function defaultZJoints(a, b) {
+  const mx = (a.x + b.x) / 2;
+  return [{ x: mx, y: a.y }, { x: mx, y: b.y }];
+}
+
+/**
+ * Mousedown on an L-corner inserted by the manhattan renderer. The corner
+ * isn't yet in wire.waypoints, so we stage an insertion to happen on first
+ * real movement (same pattern as onImplicitJointDown).
+ */
+function onImplicitCornerDown(e, wire, insertAt, pos) {
+  e.stopPropagation();
+  if (e.shiftKey) return; // not a real waypoint yet — nothing to delete
+  const pt = clientToContent(e);
+  draggingWaypoint = {
+    wire,
+    idx: insertAt,
+    dx: pt.x - pos.x,
+    dy: pt.y - pos.y,
+    moved: false,
+    pre: snapshot(),
+    pendingInsert: { at: insertAt, point: { x: pos.x, y: pos.y } },
+  };
+}
+
+/**
+ * Mousedown on a ghost joint of a no-waypoint wire. We don't commit the
+ * implicit joints into wire.waypoints up front — that would dirty the doc on
+ * every selection click. Instead we stage them on the drag state and apply
+ * on the first real mousemove (see the dragging branch in the canvas
+ * mousemove handler).
+ */
+function onImplicitJointDown(e, wire, idx, joints) {
+  e.stopPropagation();
+  if (e.shiftKey) return; // nothing to delete yet
+  const wp = joints[idx];
+  if (!wp) return;
+  const pt = clientToContent(e);
+  draggingWaypoint = {
+    wire,
+    idx,
+    dx: pt.x - wp.x,
+    dy: pt.y - wp.y,
+    moved: false,
+    pre: snapshot(),
+    pendingMaterialize: joints.map((j) => ({ x: j.x, y: j.y })),
   };
 }
 
@@ -633,7 +790,7 @@ function onPinDown(e, node, side, idx) {
   if (dstNode && srcNode) {
     const dstPt = pinPos(dstNode, dstRef.side, dstRef.pin);
     const tail = orderedWps.length ? orderedWps[orderedWps.length - 1] : pinPos(srcNode, srcRef.side, srcRef.pin);
-    if (tail.x !== dstPt.x && tail.y !== dstPt.y && routingStyle() === 'straight') {
+    if (tail.x !== dstPt.x && tail.y !== dstPt.y && orthogonalMode()) {
       // Pick the corner that extends along the dominant axis from the tail —
       // matches how the in-draw preview snaps.
       const dx = Math.abs(dstPt.x - tail.x), dy = Math.abs(dstPt.y - tail.y);
@@ -662,6 +819,18 @@ svg.addEventListener('mousemove', (e) => {
     return;
   }
   if (draggingWaypoint) {
+    // Promote a ghost joint or L-corner into a real waypoint on first
+    // movement, so a click-without-drag on an implicit handle stays a no-op.
+    if (draggingWaypoint.pendingMaterialize) {
+      draggingWaypoint.wire.waypoints = draggingWaypoint.pendingMaterialize;
+      draggingWaypoint.pendingMaterialize = null;
+    }
+    if (draggingWaypoint.pendingInsert) {
+      const wps = (draggingWaypoint.wire.waypoints || []).slice();
+      wps.splice(draggingWaypoint.pendingInsert.at, 0, draggingWaypoint.pendingInsert.point);
+      draggingWaypoint.wire.waypoints = wps;
+      draggingWaypoint.pendingInsert = null;
+    }
     const pt = clientToContent(e);
     const wps = draggingWaypoint.wire.waypoints || [];
     const wp = wps[draggingWaypoint.idx];
@@ -751,7 +920,7 @@ svg.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;
   // Quartus-style: while drawing a straight wire, a click on empty canvas adds
   // an axis-snapped routing waypoint instead of cancelling the draw.
-  if (pendingWire && routingStyle() === 'straight') {
+  if (pendingWire && orthogonalMode()) {
     const corner = pendingCornerPoint();
     if (corner) {
       pendingWire.waypoints = pendingWire.waypoints || [];
@@ -1012,7 +1181,8 @@ document.getElementById('btnUndo').addEventListener('click', undo);
 document.getElementById('btnRedo').addEventListener('click', redo);
 btnRouting.addEventListener('click', () => {
   pushHistory();
-  doc.routingStyle = routingStyle() === 'curved' ? 'straight' : 'curved';
+  const cur = routingStyle();
+  doc.routingStyle = cur === 'curved' ? 'straight' : (cur === 'straight' ? 'manhattan' : 'curved');
   setDirty(true);
   updateRoutingButton();
   render();
@@ -1180,8 +1350,11 @@ export function renderCircuitHtml(panel: vscode.WebviewPanel, extensionUri: vsco
   .wire.bus { stroke-width: 3.5; }
   .wire.selected { stroke: var(--vscode-focusBorder); }
   .wire.pending { stroke-dasharray: 4 4; opacity: 0.7; }
+  .junction { fill: var(--vscode-charts-blue, #6ab0f3); stroke: none; pointer-events: none; }
   .waypoint { fill: var(--vscode-editor-background); stroke: var(--vscode-focusBorder); stroke-width: 1.5; cursor: move; }
   .waypoint:hover { fill: var(--vscode-focusBorder); }
+  .waypoint.ghost { opacity: 0.5; stroke-dasharray: 2 2; }
+  .waypoint.ghost:hover { opacity: 1; stroke-dasharray: none; }
   .color-control { display: inline-flex; align-items: center; gap: 0.25rem; }
   .color-control input[type="color"] { width: 28px; height: 22px; border: 1px solid var(--vscode-panel-border); background: transparent; padding: 0; cursor: pointer; }
   .wire-label { fill: var(--vscode-descriptionForeground); font-size: 9px; pointer-events: none; }
@@ -1200,7 +1373,7 @@ export function renderCircuitHtml(panel: vscode.WebviewPanel, extensionUri: vsco
     <button id="btnExport" title="Export to Verilog, SystemVerilog, or VHDL">Export HDL…</button>
     <button id="btnUndo" class="ghost" title="Ctrl/Cmd+Z">Undo</button>
     <button id="btnRedo" class="ghost" title="Ctrl/Cmd+Shift+Z">Redo</button>
-    <button id="btnRouting" class="ghost" title="Toggle curved vs straight wires. Straight wires support routing waypoints.">Wires: curved</button>
+    <button id="btnRouting" class="ghost" title="Cycle wire mode: curved → straight → right-angle. Straight and right-angle modes support routing waypoints; right-angle also forces every segment to be axis-aligned.">Wires: curved</button>
     <button id="btnSnap" class="ghost" title="Snap node placement, drags, and wire waypoints to the visible grid.">Snap: on</button>
     <label class="color-control" title="Color of the current selection (nodes or wire)"><input id="colorPicker" type="color" value="#6ab0f3" /></label>
     <button id="btnClearColor" class="ghost" title="Remove color override from selection">Clear color</button>

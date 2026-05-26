@@ -69,6 +69,12 @@ export class Toolchain {
             `place_design`,
             `route_design`,
             ``,
+            // Post-route reports the dashboard scrapes — text format so we can
+            // parse without spinning up Vivado for the read. -file overwrites,
+            // so re-runs don't accumulate stale numbers.
+            `report_utilization -file build/${manifest.project_name}_utilization.rpt`,
+            `report_timing_summary -file build/${manifest.project_name}_timing.rpt`,
+            ``,
             `write_bitstream -force build/${manifest.project_name}.bit`,
             `exit`,
             ``,
@@ -249,12 +255,17 @@ export class Toolchain {
         const quartusMap = this.resolveTool(dir, "quartus_map");
         const quartusFit = this.resolveTool(dir, "quartus_fit");
         const quartusAsm = this.resolveTool(dir, "quartus_asm");
+        const quartusSta = this.resolveTool(dir, "quartus_sta");
 
         const env = this.quartusEnv(dir);
         await this.run(quartusSh, ["-t", "project.tcl"], quartusDir, env);
         await this.run(quartusMap, [manifest.project_name], quartusDir, env);
         await this.run(quartusFit, [manifest.project_name], quartusDir, env);
         await this.run(quartusAsm, [manifest.project_name], quartusDir, env);
+        // STA produces the .sta.summary the dashboard reads for Fmax / slack.
+        // We run it last so a fit-stage failure still surfaces immediately
+        // rather than being shadowed by an STA error on partial output.
+        await this.run(quartusSta, [manifest.project_name], quartusDir, env);
     }
 
     private async uploadQuartus(workspaceRoot: string, manifest: BitstreamManifest): Promise<void> {

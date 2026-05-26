@@ -33,6 +33,7 @@ import { Toolchain } from "./toolchain";
 import { VerilatorLinter } from "./linter";
 import { CircuitEditor } from "./circuit_editor/circuit";
 import { PinPlanner } from "./pinplanner";
+import { ReportsDashboard } from "./reports-dashboard";
 import { Simulator } from "./simulation";
 import { openTclConsole } from "./tclconsole";
 import { ProjectExplorer, ProjectTreeItem } from "./explorer";
@@ -97,8 +98,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             if (!root || !toolchain) { return; }
             try {
                 await toolchain.build(root);
+                // Auto-open the resource/timing dashboard if the build emitted
+                // parseable reports. Silent no-op when nothing was generated.
+                ReportsDashboard.refreshAfterBuild(root);
             } catch (err: any) {
                 vscode.window.showErrorMessage(`Bitstream build failed: ${err.message ?? err}`);
+                // Partial reports are still useful for diagnosis — surface
+                // whatever's on disk even if the build itself failed.
+                ReportsDashboard.refreshAfterBuild(root);
             }
         }),
         vscode.commands.registerCommand("bitstream.uploadBitstream", async () => {
@@ -181,6 +188,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             const root = requireWorkspaceRoot();
             if (!root) { return; }
             openTclConsole(root);
+        }),
+
+        vscode.commands.registerCommand("bitstream.showReportsDashboard", () => {
+            const root = requireWorkspaceRoot();
+            if (!root) { return; }
+            ReportsDashboard.show(root);
         }),
 
         vscode.commands.registerCommand("bitstream.refreshExplorer", () => {

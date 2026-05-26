@@ -66,7 +66,14 @@ export interface CircuitWire {
   waypoints?: Array<{ x: number; y: number }>;
 }
 
-export type RoutingStyle = "curved" | "straight";
+/**
+ * Wire layout mode:
+ *   • curved    — single bezier per wire, no waypoints.
+ *   • straight  — polyline through waypoints; segments can be any angle.
+ *   • manhattan — polyline through waypoints, but every rendered segment is
+ *                 forced to be axis-aligned (right angles only).
+ */
+export type RoutingStyle = "curved" | "straight" | "manhattan";
 
 export interface CircuitDoc {
   moduleName: string;

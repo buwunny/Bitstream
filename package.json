@@ -145,6 +145,11 @@
         "command": "bitstream.openSettings",
         "title": "Bitstream: Open Extension Settings",
         "icon": "$(gear)"
+      },
+      {
+        "command": "bitstream.showReportsDashboard",
+        "title": "Bitstream: Resource & Timing Dashboard",
+        "icon": "$(graph)"
       }
     ],
     "viewsContainers": {
@@ -179,14 +184,19 @@
           "group": "navigation@2"
         },
         {
-          "command": "bitstream.refreshExplorer",
+          "command": "bitstream.showReportsDashboard",
           "when": "view == bitstream.projectExplorer",
           "group": "navigation@3"
         },
         {
-          "command": "bitstream.newProject",
+          "command": "bitstream.refreshExplorer",
           "when": "view == bitstream.projectExplorer",
           "group": "navigation@4"
+        },
+        {
+          "command": "bitstream.newProject",
+          "when": "view == bitstream.projectExplorer",
+          "group": "navigation@5"
         },
         {
           "command": "bitstream.openSettings",
