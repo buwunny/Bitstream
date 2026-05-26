@@ -35,6 +35,7 @@ import { CircuitEditor } from "./circuit_editor/circuit";
 import { PinPlanner } from "./pinplanner";
 import { ReportsDashboard } from "./reports-dashboard";
 import { CriticalPathsView } from "./critical-paths-view";
+import { CdcLinter } from "./cdc-lint";
 import { RtlSchematic } from "./rtl-schematic";
 import { Simulator } from "./simulation";
 import { openTclConsole } from "./tclconsole";
@@ -55,6 +56,7 @@ import {
 
 let lspClient: LanguageClient | undefined;
 let linter: VerilatorLinter | undefined;
+let cdcLinter: CdcLinter | undefined;
 let toolchain: Toolchain | undefined;
 let simulator: Simulator | undefined;
 let explorer: ProjectExplorer | undefined;
@@ -65,8 +67,9 @@ let topModuleStatus: vscode.StatusBarItem | undefined;
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     toolchain = new Toolchain();
     linter = new VerilatorLinter();
+    cdcLinter = new CdcLinter();
     simulator = new Simulator();
-    context.subscriptions.push(toolchain, linter, simulator);
+    context.subscriptions.push(toolchain, linter, cdcLinter, simulator);
 
     // Project Explorer TreeView. Registered up-front so users always see the
     // panel (with a "no manifest" hint until they run the wizard). The
@@ -208,6 +211,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             const root = requireWorkspaceRoot();
             if (!root) { return; }
             CriticalPathsView.show(root);
+        }),
+
+        vscode.commands.registerCommand("bitstream.runCdcLint", () => {
+            const root = requireWorkspaceRoot();
+            if (!root || !cdcLinter) { return; }
+            const manifest = readManifest(root);
+            const count = cdcLinter.run(root, manifest.source_files);
+            if (count === 0) {
+                vscode.window.showInformationMessage("Bitstream CDC: no clock-domain crossings detected.");
+            } else {
+                vscode.window.showWarningMessage(
+                    `Bitstream CDC: ${count} potential crossing${count === 1 ? "" : "s"} flagged — see Problems panel.`,
+                );
+            }
         }),
 
         vscode.commands.registerCommand("bitstream.refreshExplorer", () => {
