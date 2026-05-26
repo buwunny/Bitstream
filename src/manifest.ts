@@ -96,7 +96,7 @@ export function isTestbenchFile(relPath: string): boolean {
  */
 export function findFilesByExt(root: string, exts: string[]): string[] {
     const ignore = new Set([
-        "node_modules", ".git", "out", "build",
+        "node_modules", ".git", "out", "build", ".bitstream",
         "vivado_project", "quartus_project",
         ".Xil", "output_files", "db", "incremental_db",
     ]);

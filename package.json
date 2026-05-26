@@ -165,6 +165,11 @@
         "command": "bitstream.runCdcLint",
         "title": "Bitstream: Run CDC Lint (clock-domain crossings)",
         "icon": "$(pulse)"
+      },
+      {
+        "command": "bitstream.showBuildHistory",
+        "title": "Bitstream: Build History",
+        "icon": "$(history)"
       }
     ],
     "viewsContainers": {
@@ -219,14 +224,19 @@
           "group": "navigation@6"
         },
         {
-          "command": "bitstream.refreshExplorer",
+          "command": "bitstream.showBuildHistory",
           "when": "view == bitstream.projectExplorer",
           "group": "navigation@7"
         },
         {
-          "command": "bitstream.newProject",
+          "command": "bitstream.refreshExplorer",
           "when": "view == bitstream.projectExplorer",
           "group": "navigation@8"
+        },
+        {
+          "command": "bitstream.newProject",
+          "when": "view == bitstream.projectExplorer",
+          "group": "navigation@9"
         },
         {
           "command": "bitstream.openSettings",

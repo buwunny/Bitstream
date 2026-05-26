@@ -36,6 +36,9 @@ import { PinPlanner } from "./pinplanner";
 import { ReportsDashboard } from "./reports-dashboard";
 import { CriticalPathsView } from "./critical-paths-view";
 import { CdcLinter } from "./cdc-lint";
+import { BuildHistoryView } from "./build-history-view";
+import { appendEntry as appendHistoryEntry } from "./build-history";
+import { loadBuildReport } from "./reports";
 import { RtlSchematic } from "./rtl-schematic";
 import { Simulator } from "./simulation";
 import { openTclConsole } from "./tclconsole";
@@ -106,6 +109,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 // Auto-open the resource/timing dashboard if the build emitted
                 // parseable reports. Silent no-op when nothing was generated.
                 ReportsDashboard.refreshAfterBuild(root);
+                // Persist a snapshot for the Build History view — best-effort,
+                // never blocks the user on a failure to write the journal.
+                recordBuildHistory(root);
             } catch (err: any) {
                 vscode.window.showErrorMessage(`Bitstream build failed: ${err.message ?? err}`);
                 // Partial reports are still useful for diagnosis — surface
@@ -211,6 +217,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             const root = requireWorkspaceRoot();
             if (!root) { return; }
             CriticalPathsView.show(root);
+        }),
+
+        vscode.commands.registerCommand("bitstream.showBuildHistory", () => {
+            const root = requireWorkspaceRoot();
+            if (!root) { return; }
+            BuildHistoryView.show(root);
         }),
 
         vscode.commands.registerCommand("bitstream.runCdcLint", () => {
@@ -490,6 +502,21 @@ function registerStatusBar(context: vscode.ExtensionContext): void {
     if (root && manifestExists(root)) {
         try { updateTopModuleStatus(readManifest(root).top_module); } catch { /* ignore */ }
     }
+}
+
+/**
+ * Append a snapshot of the freshly-built reports to `.bitstream/history.json`.
+ * Best-effort: missing reports, missing git repo, or write errors all degrade
+ * silently — the build itself is what the user cares about, the journal is
+ * just an audit trail.
+ */
+function recordBuildHistory(workspaceRoot: string): void {
+    try {
+        const manifest = readManifest(workspaceRoot);
+        const report = loadBuildReport(workspaceRoot, manifest.vendor, manifest.project_name);
+        if (!report) { return; }
+        appendHistoryEntry(workspaceRoot, report);
+    } catch { /* swallow */ }
 }
 
 function updateTopModuleStatus(top: string | undefined): void {
