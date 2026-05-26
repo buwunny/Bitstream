@@ -66,15 +66,19 @@ export class CircuitEditor {
   private static instances: CircuitEditor[] = [];
 
   public static show(extensionUri: vscode.Uri, openFile?: vscode.Uri): void {
-    const panel = vscode.window.createWebviewPanel(
+    const panel = CircuitEditor.createPanel(extensionUri);
+    const editor = new CircuitEditor(panel, extensionUri);
+    CircuitEditor.instances.push(editor);
+    if (openFile) { editor.loadFromDisk(openFile); }
+  }
+
+  private static createPanel(extensionUri: vscode.Uri): vscode.WebviewPanel {
+    return vscode.window.createWebviewPanel(
       CircuitEditor.viewType,
       "Circuit Editor",
       vscode.ViewColumn.Active,
       { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [extensionUri] },
     );
-    const editor = new CircuitEditor(panel, extensionUri);
-    CircuitEditor.instances.push(editor);
-    if (openFile) { editor.loadFromDisk(openFile); }
   }
 
   private readonly panel: vscode.WebviewPanel;
@@ -82,6 +86,16 @@ export class CircuitEditor {
   private readonly disposables: vscode.Disposable[] = [];
 
   private readonly extensionUri: vscode.Uri;
+
+  // Latest doc snapshot pushed from the webview. Used by the close prompt:
+  // webview panels can't block their own disposal, so when onDidDispose fires
+  // while dirty we read this cache to either save the file or reopen the
+  // panel with state preserved.
+  private cachedDoc: CircuitDoc | undefined;
+  private isDirty = false;
+  // Set when we're tearing down for real (after the user picked Save/Don't
+  // Save, or after a programmatic dispose) so the dispose hook doesn't loop.
+  private finalizing = false;
 
   private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this.panel = panel;
@@ -93,7 +107,7 @@ export class CircuitEditor {
       }),
       null, this.disposables,
     );
-    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+    this.panel.onDidDispose(() => { void this.handleDispose(); }, null, this.disposables);
   }
 
   private async handleMessage(msg: any): Promise<void> {
@@ -105,8 +119,75 @@ export class CircuitEditor {
       case "importHdlModule": return this.importHdlModule(msg.ownName as string | undefined);
       case "openModule": return this.openModuleFile(msg.file as string);
       case "reloadModules": return this.reloadModules(msg.modules as Array<{ name: string; file: string }>);
-      case "dirty": this.panel.title = msg.payload ? "Circuit Editor •" : "Circuit Editor"; return;
+      case "dirty":
+        this.isDirty = !!msg.payload;
+        this.panel.title = msg.payload ? "Circuit Editor •" : "Circuit Editor";
+        return;
+      case "docSync":
+        this.cachedDoc = msg.payload as CircuitDoc;
+        return;
     }
+  }
+
+  /**
+   * Webview panels can't veto disposal, so we react after the fact: if the
+   * doc was dirty when the user closed the tab, we either save it, drop it,
+   * or reopen the panel with the latest state. Cancel (escape) preserves
+   * work — the panel is recreated and re-seeded as still-dirty so the next
+   * close attempt re-prompts.
+   */
+  private async handleDispose(): Promise<void> {
+    CircuitEditor.instances = CircuitEditor.instances.filter((e) => e !== this);
+    if (this.finalizing || !this.isDirty || !this.cachedDoc) {
+      this.disposeNow();
+      return;
+    }
+
+    const doc = this.cachedDoc;
+    const currentPath = this.currentPath;
+    const label = currentPath ? path.basename(currentPath.fsPath) : (doc.moduleName || "untitled");
+    const choice = await vscode.window.showWarningMessage(
+      `Save changes to "${label}" before closing?`,
+      { modal: true, detail: "Your changes will be lost if you don't save them." },
+      "Save", "Don't Save",
+    );
+
+    if (choice === "Save") {
+      try { await this.save(doc, false); } catch (err: any) {
+        vscode.window.showErrorMessage(`Failed to save circuit: ${err?.message ?? err}`);
+        CircuitEditor.reopen(this.extensionUri, currentPath, doc);
+        this.disposeNow();
+        return;
+      }
+      this.disposeNow();
+    } else if (choice === "Don't Save") {
+      this.disposeNow();
+    } else {
+      // Cancel — reopen a fresh panel pre-loaded with the unsaved state.
+      CircuitEditor.reopen(this.extensionUri, currentPath, doc);
+      this.disposeNow();
+    }
+  }
+
+  private disposeNow(): void {
+    this.finalizing = true;
+    for (const d of this.disposables) { d.dispose(); }
+  }
+
+  private static reopen(extensionUri: vscode.Uri, currentPath: vscode.Uri | undefined, doc: CircuitDoc): void {
+    const panel = CircuitEditor.createPanel(extensionUri);
+    const editor = new CircuitEditor(panel, extensionUri);
+    CircuitEditor.instances.push(editor);
+    editor.currentPath = currentPath;
+    editor.cachedDoc = doc;
+    editor.isDirty = true;
+    editor.panel.title = "Circuit Editor •";
+    editor.panel.webview.postMessage({
+      type: "loaded",
+      payload: doc,
+      path: currentPath?.fsPath,
+      dirty: true,
+    });
   }
 
   private async save(doc: CircuitDoc, asNew: boolean): Promise<void> {
@@ -183,10 +264,10 @@ export class CircuitEditor {
     const picked = await vscode.window.showOpenDialog({
       canSelectFiles: true, canSelectFolders: false, canSelectMany: false,
       filters: {
+        "All HDL": ["v", "vh", "sv", "svh", "vhd", "vhdl"],
         "Verilog": ["v", "vh"],
         "SystemVerilog": ["sv", "svh"],
         "VHDL": ["vhd", "vhdl"],
-        "All HDL": ["v", "vh", "sv", "svh", "vhd", "vhdl"],
       },
     });
     if (!picked || !picked[0]) { return; }
@@ -339,7 +420,8 @@ export class CircuitEditor {
   }
 
   public dispose(): void {
-    for (const d of this.disposables) { d.dispose(); }
+    this.finalizing = true;
     CircuitEditor.instances = CircuitEditor.instances.filter((e) => e !== this);
+    for (const d of this.disposables) { d.dispose(); }
   }
 }

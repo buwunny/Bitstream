@@ -111,7 +111,22 @@ const btnClearColor = document.getElementById('btnClearColor');
 const DEFAULT_PICKER_COLOR = '#6ab0f3';
 
 function freshId() { return 'n' + (nextId++); }
-function setDirty(v) { if (dirty === v) return; dirty = v; vscode.postMessage({ type: 'dirty', payload: v }); }
+
+// Throttled snapshot to the host so it can prompt-to-save if the panel is
+// closed while dirty. Webview panels can't block their own disposal, so the
+// host keeps a copy of the current doc to either save or reopen on cancel.
+let _docSyncTimer = null;
+function scheduleDocSync() {
+  if (_docSyncTimer) return;
+  _docSyncTimer = setTimeout(() => {
+    _docSyncTimer = null;
+    vscode.postMessage({ type: 'docSync', payload: doc });
+  }, 250);
+}
+function setDirty(v) {
+  if (dirty !== v) { dirty = v; vscode.postMessage({ type: 'dirty', payload: v }); }
+  if (v) scheduleDocSync();
+}
 function routingStyle() { return doc.routingStyle || 'curved'; }
 function updateRoutingButton() {
   btnRouting.textContent = 'Wires: ' + routingStyle();
@@ -889,6 +904,27 @@ function pasteClipboard() {
   render();
 }
 
+// ----- Palette: collapsible sections ----------------------------------------
+// Persist open/closed state in webview state so it survives reloads while the
+// panel is alive. Default: all sections open.
+(function initPaletteSections() {
+  const state = (typeof vscode.getState === 'function' && vscode.getState()) || {};
+  const collapsed = new Set(state.collapsedSections || []);
+  document.querySelectorAll('.palette-section').forEach((section) => {
+    const key = section.dataset.section;
+    if (collapsed.has(key)) section.classList.add('collapsed');
+    const header = section.querySelector('.palette-header');
+    if (!header) return;
+    header.addEventListener('click', () => {
+      section.classList.toggle('collapsed');
+      if (section.classList.contains('collapsed')) collapsed.add(key);
+      else collapsed.delete(key);
+      const prev = (typeof vscode.getState === 'function' && vscode.getState()) || {};
+      vscode.setState(Object.assign({}, prev, { collapsedSections: Array.from(collapsed) }));
+    });
+  });
+})();
+
 // ----- Palette: built-in items and dynamic modules --------------------------
 document.querySelectorAll('.palette .item').forEach((el) => attachPaletteDrag(el));
 function attachPaletteDrag(el) {
@@ -1012,7 +1048,7 @@ window.addEventListener('message', (event) => {
     history.length = 0; future.length = 0;
     view = { tx: 0, ty: 0, scale: 1 }; applyView();
     rebuildModulePalette();
-    setDirty(false);
+    setDirty(!!msg.dirty);
     updateRoutingButton();
     syncColorPickerToSelection();
     render();
@@ -1108,6 +1144,11 @@ export function renderCircuitHtml(panel: vscode.WebviewPanel, extensionUri: vsco
   .body { display: grid; grid-template-columns: 180px 1fr; min-height: 0; }
   .palette { border-right: 1px solid var(--vscode-panel-border); padding: 0.5rem; overflow-y: auto; }
   .palette h3 { font-size: 0.75rem; opacity: 0.7; margin: 0.75rem 0 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .palette-section h3.palette-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; padding: 0.15rem 0.1rem; border-radius: 2px; }
+  .palette-section h3.palette-header:hover { background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.04)); opacity: 0.9; }
+  .palette-section .chevron { font-size: 0.7rem; transition: transform 0.15s; display: inline-block; opacity: 0.7; }
+  .palette-section.collapsed .chevron { transform: rotate(-90deg); }
+  .palette-section.collapsed .palette-content { display: none; }
   .palette .item { padding: 0.4rem 0.5rem; margin: 0.15rem 0; background: var(--vscode-editor-inactiveSelectionBackground); cursor: grab; user-select: none; font-family: var(--vscode-editor-font-family, monospace); font-size: 0.85rem; border-radius: 2px; display: flex; justify-content: space-between; align-items: center; }
   .palette .item .badge { opacity: 0.5; font-size: 0.7rem; }
   .palette .item:active { cursor: grabbing; }
@@ -1169,25 +1210,41 @@ export function renderCircuitHtml(panel: vscode.WebviewPanel, extensionUri: vsco
   </div>
   <div class="body">
     <div class="palette" id="palette">
-      <h3>I/O</h3>
-      <div class="item" draggable="true" data-type="INPUT">INPUT</div>
-      <div class="item" draggable="true" data-type="OUTPUT">OUTPUT</div>
-      <h3>Gates</h3>
-      <div class="item" draggable="true" data-type="AND">AND</div>
-      <div class="item" draggable="true" data-type="OR">OR</div>
-      <div class="item" draggable="true" data-type="XOR">XOR</div>
-      <div class="item" draggable="true" data-type="NAND">NAND</div>
-      <div class="item" draggable="true" data-type="NOR">NOR</div>
-      <div class="item" draggable="true" data-type="XNOR">XNOR</div>
-      <div class="item" draggable="true" data-type="NOT">NOT</div>
-      <div class="item" draggable="true" data-type="BUF">BUF</div>
-      <h3>Sequential</h3>
-      <div class="item" draggable="true" data-type="DFF">DFF</div>
-      <h3>Modules</h3>
-      <div id="moduleList"></div>
-      <button class="add" id="btnImportModule">+ Import Circuit Module…</button>
-      <button class="add" id="btnImportHdl" title="Import a Verilog/SystemVerilog module as a component">+ Import HDL Module…</button>
-      <button class="add" id="btnReloadModules" title="Re-read every imported module from its source file">⟳ Reload from disk</button>
+      <div class="palette-section" data-section="io">
+        <h3 class="palette-header">I/O <span class="chevron">▾</span></h3>
+        <div class="palette-content">
+          <div class="item" draggable="true" data-type="INPUT">INPUT</div>
+          <div class="item" draggable="true" data-type="OUTPUT">OUTPUT</div>
+        </div>
+      </div>
+      <div class="palette-section" data-section="gates">
+        <h3 class="palette-header">Gates <span class="chevron">▾</span></h3>
+        <div class="palette-content">
+          <div class="item" draggable="true" data-type="AND">AND</div>
+          <div class="item" draggable="true" data-type="OR">OR</div>
+          <div class="item" draggable="true" data-type="XOR">XOR</div>
+          <div class="item" draggable="true" data-type="NAND">NAND</div>
+          <div class="item" draggable="true" data-type="NOR">NOR</div>
+          <div class="item" draggable="true" data-type="XNOR">XNOR</div>
+          <div class="item" draggable="true" data-type="NOT">NOT</div>
+          <div class="item" draggable="true" data-type="BUF">BUF</div>
+        </div>
+      </div>
+      <div class="palette-section" data-section="sequential">
+        <h3 class="palette-header">Sequential <span class="chevron">▾</span></h3>
+        <div class="palette-content">
+          <div class="item" draggable="true" data-type="DFF">DFF</div>
+        </div>
+      </div>
+      <div class="palette-section" data-section="modules">
+        <h3 class="palette-header">Modules <span class="chevron">▾</span></h3>
+        <div class="palette-content">
+          <div id="moduleList"></div>
+          <button class="add" id="btnImportModule">+ Import Circuit Module…</button>
+          <button class="add" id="btnImportHdl" title="Import a Verilog/SystemVerilog module as a component">+ Import HDL Module…</button>
+          <button class="add" id="btnReloadModules" title="Re-read every imported module from its source file">⟳ Reload from disk</button>
+        </div>
+      </div>
     </div>
     <div class="canvas-wrap">
       <svg class="canvas" id="canvas" xmlns="http://www.w3.org/2000/svg">
