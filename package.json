@@ -150,6 +150,11 @@
         "command": "bitstream.showReportsDashboard",
         "title": "Bitstream: Resource & Timing Dashboard",
         "icon": "$(graph)"
+      },
+      {
+        "command": "bitstream.showRtlSchematic",
+        "title": "Bitstream: Show RTL Schematic (Yosys)",
+        "icon": "$(circuit-board)"
       }
     ],
     "viewsContainers": {
@@ -184,19 +189,24 @@
           "group": "navigation@2"
         },
         {
-          "command": "bitstream.showReportsDashboard",
+          "command": "bitstream.showRtlSchematic",
           "when": "view == bitstream.projectExplorer",
           "group": "navigation@3"
         },
         {
-          "command": "bitstream.refreshExplorer",
+          "command": "bitstream.showReportsDashboard",
           "when": "view == bitstream.projectExplorer",
           "group": "navigation@4"
         },
         {
-          "command": "bitstream.newProject",
+          "command": "bitstream.refreshExplorer",
           "when": "view == bitstream.projectExplorer",
           "group": "navigation@5"
+        },
+        {
+          "command": "bitstream.newProject",
+          "when": "view == bitstream.projectExplorer",
+          "group": "navigation@6"
         },
         {
           "command": "bitstream.openSettings",
@@ -269,6 +279,11 @@
           "type": "string",
           "default": "gtkwave",
           "description": "Path to GTKWave, used to open waveforms (VCD/FST) produced by simulation runs."
+        },
+        "hdlToolchain.yosysPath": {
+          "type": "string",
+          "default": "yosys",
+          "description": "Path to the Yosys binary used to synthesise the RTL schematic viewer. Requires graphviz 'dot' on PATH as well — Yosys 'show' shells out to it."
         }
       }
     }

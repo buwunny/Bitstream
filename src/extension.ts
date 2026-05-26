@@ -34,6 +34,7 @@ import { VerilatorLinter } from "./linter";
 import { CircuitEditor } from "./circuit_editor/circuit";
 import { PinPlanner } from "./pinplanner";
 import { ReportsDashboard } from "./reports-dashboard";
+import { RtlSchematic } from "./rtl-schematic";
 import { Simulator } from "./simulation";
 import { openTclConsole } from "./tclconsole";
 import { ProjectExplorer, ProjectTreeItem } from "./explorer";
@@ -194,6 +195,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             const root = requireWorkspaceRoot();
             if (!root) { return; }
             ReportsDashboard.show(root);
+        }),
+
+        vscode.commands.registerCommand("bitstream.showRtlSchematic", async () => {
+            const root = requireWorkspaceRoot();
+            if (!root) { return; }
+            await RtlSchematic.show(root);
         }),
 
         vscode.commands.registerCommand("bitstream.refreshExplorer", () => {
