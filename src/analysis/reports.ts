@@ -18,7 +18,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { Vendor } from "./manifest";
+import { Vendor } from "../project/manifest";
 
 // ---------------------------------------------------------------------------
 // Public shape

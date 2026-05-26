@@ -20,8 +20,8 @@ import * as fs from "fs";
 import * as path from "path";
 import {
     BitstreamManifest, manifestExists, readManifest, writeManifest,
-} from "./manifest";
-import { ModulePort, parseWorkspaceModules } from "./hierarchy";
+} from "../project/manifest";
+import { ModulePort, parseWorkspaceModules } from "../project/hierarchy";
 
 interface PinRow {
     port: string;

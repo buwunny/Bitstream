@@ -8,7 +8,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { parseVerilogText, parseVhdlText, ModuleDecl } from "../hierarchy";
+import { parseVerilogText, parseVhdlText, ModuleDecl } from "../../project/hierarchy";
 import { CircuitDoc, HdlLanguage, ModulePort } from "./circuit-types";
 
 /** Make an identifier safe to use as a Verilog/VHDL name. */

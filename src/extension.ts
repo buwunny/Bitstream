@@ -28,22 +28,22 @@ import {
     ServerOptions,
 } from "vscode-languageclient/node";
 
-import { ProjectWizard } from "./wizard";
-import { Toolchain } from "./toolchain";
-import { VerilatorLinter } from "./linter";
-import { CircuitEditor } from "./circuit_editor/circuit";
-import { PinPlanner } from "./pinplanner";
-import { ReportsDashboard } from "./reports-dashboard";
-import { CriticalPathsView } from "./critical-paths-view";
-import { CdcLinter } from "./cdc-lint";
-import { BuildHistoryView } from "./build-history-view";
-import { appendEntry as appendHistoryEntry } from "./build-history";
-import { loadBuildReport } from "./reports";
-import { RtlSchematic } from "./rtl-schematic";
-import { Simulator } from "./simulation";
-import { openTclConsole } from "./tclconsole";
-import { ProjectExplorer, ProjectTreeItem } from "./explorer";
-import { parseWorkspaceModules } from "./hierarchy";
+import { ProjectWizard } from "./project/wizard";
+import { Toolchain } from "./build/toolchain";
+import { VerilatorLinter } from "./build/linter";
+import { CircuitEditor } from "./editors/circuit_editor/circuit";
+import { PinPlanner } from "./editors/pinplanner";
+import { ReportsDashboard } from "./analysis/reports-dashboard";
+import { CriticalPathsView } from "./analysis/critical-paths-view";
+import { CdcLinter } from "./build/cdc-lint";
+import { BuildHistoryView } from "./analysis/build-history-view";
+import { appendEntry as appendHistoryEntry } from "./analysis/build-history";
+import { loadBuildReport } from "./analysis/reports";
+import { RtlSchematic } from "./analysis/rtl-schematic";
+import { Simulator } from "./build/simulation";
+import { openTclConsole } from "./build/tclconsole";
+import { ProjectExplorer, ProjectTreeItem } from "./project/explorer";
+import { parseWorkspaceModules } from "./project/hierarchy";
 import {
     BitstreamManifest,
     MANIFEST_FILE,
@@ -55,7 +55,7 @@ import {
     writeGitignore,
     findFilesByExt,
     isTestbenchFile,
-} from "./manifest";
+} from "./project/manifest";
 
 let lspClient: LanguageClient | undefined;
 let linter: VerilatorLinter | undefined;

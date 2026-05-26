@@ -22,7 +22,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as cp from "child_process";
 import { BuildReport } from "./reports";
-import { Vendor } from "./manifest";
+import { Vendor } from "../project/manifest";
 
 const HISTORY_DIR = ".bitstream";
 const HISTORY_FILE = "history.json";

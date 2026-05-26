@@ -20,7 +20,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { Vendor } from "./manifest";
+import { Vendor } from "../project/manifest";
 
 export interface TimingPathPoint {
     /** Hierarchical netlist resource, e.g. `u_top/u_alu/result_reg[0]/Q`. */

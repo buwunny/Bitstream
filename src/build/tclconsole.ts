@@ -12,7 +12,7 @@
  */
 
 import * as vscode from "vscode";
-import { readManifest, manifestExists } from "./manifest";
+import { readManifest, manifestExists } from "../project/manifest";
 
 const TERMINAL_NAME = "Bitstream Tcl";
 

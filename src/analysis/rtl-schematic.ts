@@ -19,7 +19,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import * as cp from "child_process";
-import { readManifest } from "./manifest";
+import { readManifest } from "../project/manifest";
 
 const BUILD_DIR = "build";
 const PREFIX = "rtl_schematic";

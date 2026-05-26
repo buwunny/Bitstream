@@ -6,7 +6,6 @@ yarn.lock
 # Build output
 out/
 dist/
-build/
 *.tsbuildinfo
 
 # IDE

@@ -13,7 +13,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { BuildReport, loadBuildReport } from "./reports";
-import { readManifest } from "./manifest";
+import { readManifest } from "../project/manifest";
 
 export class ReportsDashboard {
     public static readonly viewType = "bitstream.reportsDashboard";

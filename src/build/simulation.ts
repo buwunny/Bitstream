@@ -21,7 +21,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import * as cp from "child_process";
-import { BitstreamManifest, readManifest } from "./manifest";
+import { BitstreamManifest, readManifest } from "../project/manifest";
 
 export class Simulator {
     private readonly output: vscode.OutputChannel;

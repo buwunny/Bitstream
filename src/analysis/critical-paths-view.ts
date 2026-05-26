@@ -15,8 +15,8 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { CriticalPathsReport, TimingPath, loadCriticalPaths, resolveEndpoint } from "./critical-paths";
-import { readManifest } from "./manifest";
-import { parseWorkspaceModules } from "./hierarchy";
+import { readManifest } from "../project/manifest";
+import { parseWorkspaceModules } from "../project/hierarchy";
 
 export class CriticalPathsView {
     public static readonly viewType = "bitstream.criticalPaths";
