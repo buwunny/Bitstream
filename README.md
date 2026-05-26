@@ -89,6 +89,80 @@ All tool paths are configurable under **Settings → Bitstream** (`hdlToolchain.
 
 The manifest is the only file you need to commit alongside your HDL. A fresh clone plus `bitstream.json` is enough to fully rebuild the project.
 
+## Roadmap
+
+Items are grouped by phase. Within each phase they are roughly ordered by effort, lightest first.
+
+### Phase 1 — Analysis & Reporting
+
+Parse the artifacts that `bitstream.buildBitstream` already produces and surface them in the UI. No new external tools required.
+
+- [ ] **Utilization dashboard** — webview that parses `utilization.rpt` and `*.fit.summary` after every build, showing LUT / FF / BRAM / DSP / IO percentages with a per-module breakdown.
+- [ ] **Timing summary panel** — extract WNS / TNS / WHS / THS / Fmax from `report_timing_summary` and `quartus_sta` output; status-bar badge turns red on negative slack.
+- [ ] **Critical path inspector** — list the worst N timing paths, click to jump to the source RTL line via the existing hierarchy index in [src/hierarchy.ts](src/hierarchy.ts).
+- [ ] **Build history & regression tracking** — append `{commit, utilization, wns, fmax, build_time}` to `.bitstream/history.json` after each successful build; plot trends in a webview.
+- [ ] **Pin / IO timing report** — surface input setup, clock-to-out, and IO standard mismatches in the Problems tab, cross-linked to the [Pin Planner](src/pinplanner.ts).
+- [ ] **Latch & inferred-flop detector** — parse synthesis warnings, mark offending lines with a diagnostic.
+
+### Phase 2 — Lint, Verification & Debug
+
+Wrap open-source verification tooling behind the same one-click UX as the existing Verilator integration in [src/linter.ts](src/linter.ts).
+
+- [ ] **CDC (clock-domain-crossing) lint** — static pass over the parsed netlist (Yosys JSON) detecting signals sampled across clock domains without synchronizer chains.
+- [ ] **RDC (reset-domain-crossing) lint** — same approach for async resets crossing domains.
+- [ ] **Naming / style / synthesizability linter** — configurable rule set (`bitstream.lint.rules` in the manifest); covers Verilator-missed cases like blocking-assignment-in-sequential, missing default cases, undriven nets.
+- [ ] **Formal property checking** — wrap `symbiyosys` so users can add SVA / immediate assertions in their RTL and run `bmc`, `prove`, `cover` from the command palette.
+- [ ] **Code coverage heatmap** — Verilator already emits line/branch/toggle coverage; render it as editor gutter decorations and a per-module summary.
+- [ ] **Functional coverage & cover-group reports** — parse SystemVerilog covergroups via Verilator or `symbiyosys`.
+- [ ] **In-system logic analyzer** — insert a debug core that captures signals to BRAM, triggered on a user-defined condition; dump over JTAG via OpenOCD or `xsdb`; auto-open the result in GTKWave.
+- [ ] **Virtual I/O (VIO)** — a webview with toggles and LEDs that maps to debug registers in the synthesized design, polled over JTAG.
+- [ ] **Waveform compare** — diff two VCD/FST files (golden vs. current run) and report the first divergence per signal.
+
+### Phase 3 — Synthesis, Implementation & Floorplan
+
+Make the synthesis flow visible and tractable to edit, not just a black box.
+
+- [ ] **RTL schematic viewer** — run `yosys -p "read_verilog ...; proc; opt; show -format json"` on the manifest sources and render the netlist in the existing [circuit editor webview](src/circuit_editor/circuit-webview.ts).
+- [ ] **Post-synthesis netlist viewer** — same renderer, but after `synth_xilinx` / `synth_intel` so users can see how their RTL mapped to LUTs / DSPs / BRAMs.
+- [ ] **Floorplan / device-view heatmap** — parse the placement report and draw the device fabric as a grid, colour-coded by module ownership or utilisation density.
+- [ ] **Incremental compile** — hash sources, constraints, and tool versions per stage; skip synth when only constraints changed, skip P&R when the synth-hash matches.
+- [ ] **Multi-strategy implementation runs** — kick off N parallel builds with different synthesis / placement / routing directives; pick the best by WNS.
+- [ ] **Multi-target build matrix** — same RTL, multiple devices (e.g. `xc7a35t` and `xc7a100t`); useful for board-bringup and SoC variants.
+- [ ] **Retiming and physical-optimization reports** — surface what the tool moved or replicated and why.
+
+### Phase 4 — IP, Block Design & HLS
+
+Make composition first-class so users don't have to hand-instantiate boilerplate.
+
+- [ ] **Parameterized IP catalog** — drop-in cores for FIFOs, BRAM, MMCM/PLL clock wizards, AXI4-Lite bridges, UART, SPI, I2C, DDR controllers.
+- [ ] **Block-design / IP integrator** — extend [circuit_editor/](src/circuit_editor/) to instantiate IP, draw connections between AXI/Avalon interfaces, and emit a top-level wrapper into `source_files`.
+- [ ] **Bus / interface inference** — detect AXI / Avalon / Wishbone port bundles in user RTL and group them automatically.
+- [ ] **AXI / protocol checkers** — synthesizable monitors that flag spec violations during simulation.
+- [ ] **Register-map / CSR generator** — author a `regmap.yaml` per IP and emit the RTL, C headers, and Markdown docs.
+- [ ] **IP packager** — export a folder as a reusable IP block with its own manifest fragment.
+- [ ] **High-level synthesis (HLS)** — optional integration with `bambu` or `XLS` to compile C / C++ / DSLX to RTL and inject the result into `source_files`.
+
+### Phase 5 — Productivity, Power & Deployment
+
+- [ ] **Power estimator** — combine VCD switching activity from simulation with device characterisation tables to produce a per-module dynamic + static power breakdown.
+- [ ] **Thermal estimator** — extend the power model with package thermal resistance to flag designs that exceed Tj at the target ambient.
+- [ ] **Constraint wizard** — generate XDC / SDC / QSF templates for common patterns (clock definitions, IO standards, false paths, multicycle paths).
+- [ ] **Bitstream encryption & signing** — `write_bitstream -encrypt` / `quartus_cpf` wrappers with key management stored outside the repo.
+- [ ] **Remote / cloud build offload** — ship the manifest plus sources to a remote runner (SSH or GitHub Actions); stream the same `Bitstream: Toolchain` output back to the local channel.
+- [ ] **Remote programming** — program a board attached to another machine over the network (xvcd, ftd2xx-over-TCP).
+- [ ] **OTA / partial-reconfiguration tooling** — manage partial bitstreams and update flows for devices that support dynamic partial reconfiguration.
+- [ ] **Auto-generated documentation** — emit a Markdown page per project with the block diagram, register map, pin map, utilization, and timing summary.
+
+### Phase 6 — Simulation upgrades
+
+The current flow in [src/simulation.ts](src/simulation.ts) is single-testbench Icarus + GTKWave. The items below scale it to a full regression flow.
+
+- [ ] **Mixed-language simulation** — drop in `nvc` or `ghdl` + `cocotb` so a single testbench can drive both Verilog and VHDL DUTs.
+- [ ] **cocotb / Python testbench runner** — first-class command-palette support; surface pass/fail counts in the Problems tab.
+- [ ] **Regression runner** — run every `*_tb.*` file in the manifest, parallelised across cores, with a webview pass/fail grid.
+- [ ] **Coverage merge across runs** — accumulate Verilator coverage from a regression and report the union.
+- [ ] **Simulation performance profiler** — show which always-blocks and modules dominate simulator time.
+
 ## License
 
 MIT
