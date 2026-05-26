@@ -167,6 +167,16 @@
         "icon": "$(pulse)"
       },
       {
+        "command": "bitstream.checkIoTiming",
+        "title": "Bitstream: Check Pin / IO Timing",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "bitstream.detectLatches",
+        "title": "Bitstream: Detect Inferred Latches & Undriven Nets",
+        "icon": "$(warning)"
+      },
+      {
         "command": "bitstream.showBuildHistory",
         "title": "Bitstream: Build History",
         "icon": "$(history)"
@@ -249,8 +259,16 @@
           "group": "1_analysis@4"
         },
         {
-          "command": "bitstream.showBuildHistory",
+          "command": "bitstream.checkIoTiming",
           "group": "1_analysis@5"
+        },
+        {
+          "command": "bitstream.detectLatches",
+          "group": "1_analysis@6"
+        },
+        {
+          "command": "bitstream.showBuildHistory",
+          "group": "1_analysis@7"
         }
       ],
       "view/item/context": [

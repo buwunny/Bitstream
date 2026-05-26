@@ -34,6 +34,9 @@ import { VerilatorLinter } from "./build/linter";
 import { CircuitEditor } from "./editors/circuit_editor/circuit";
 import { PinPlanner } from "./editors/pinplanner";
 import { ReportsDashboard } from "./analysis/reports-dashboard";
+import { TimingBadge } from "./analysis/timing-badge";
+import { IoTimingChecker } from "./analysis/io-timing";
+import { LatchDetector } from "./analysis/latch-detector";
 import { CriticalPathsView } from "./analysis/critical-paths-view";
 import { CdcLinter } from "./build/cdc-lint";
 import { BuildHistoryView } from "./analysis/build-history-view";
@@ -63,6 +66,9 @@ let cdcLinter: CdcLinter | undefined;
 let toolchain: Toolchain | undefined;
 let simulator: Simulator | undefined;
 let explorer: ProjectExplorer | undefined;
+let timingBadge: TimingBadge | undefined;
+let ioTiming: IoTimingChecker | undefined;
+let latchDetector: LatchDetector | undefined;
 let buildStatus: vscode.StatusBarItem | undefined;
 let uploadStatus: vscode.StatusBarItem | undefined;
 let topModuleStatus: vscode.StatusBarItem | undefined;
@@ -72,7 +78,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     linter = new VerilatorLinter();
     cdcLinter = new CdcLinter();
     simulator = new Simulator();
-    context.subscriptions.push(toolchain, linter, cdcLinter, simulator);
+    timingBadge = new TimingBadge();
+    ioTiming = new IoTimingChecker();
+    latchDetector = new LatchDetector();
+    context.subscriptions.push(toolchain, linter, cdcLinter, simulator, timingBadge, ioTiming, latchDetector);
 
     // Project Explorer TreeView. Registered up-front so users always see the
     // panel (with a "no manifest" hint until they run the wizard). The
@@ -109,6 +118,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 // Auto-open the resource/timing dashboard if the build emitted
                 // parseable reports. Silent no-op when nothing was generated.
                 ReportsDashboard.refreshAfterBuild(root);
+                timingBadge?.refresh(root);
+                ioTiming?.refresh(root);
+                latchDetector?.refresh(root);
                 // Persist a snapshot for the Build History view — best-effort,
                 // never blocks the user on a failure to write the journal.
                 recordBuildHistory(root);
@@ -117,6 +129,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 // Partial reports are still useful for diagnosis — surface
                 // whatever's on disk even if the build itself failed.
                 ReportsDashboard.refreshAfterBuild(root);
+                timingBadge?.refresh(root);
+                ioTiming?.refresh(root);
+                latchDetector?.refresh(root);
             }
         }),
         vscode.commands.registerCommand("bitstream.uploadBitstream", async () => {
@@ -225,6 +240,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             BuildHistoryView.show(root);
         }),
 
+        vscode.commands.registerCommand("bitstream.detectLatches", () => {
+            const root = requireWorkspaceRoot();
+            if (!root || !latchDetector) { return; }
+            latchDetector.refresh(root);
+            vscode.window.showInformationMessage("Bitstream: synthesis warning scan complete — see Problems panel.");
+        }),
+
+        vscode.commands.registerCommand("bitstream.checkIoTiming", () => {
+            const root = requireWorkspaceRoot();
+            if (!root || !ioTiming) { return; }
+            ioTiming.refresh(root);
+            vscode.window.showInformationMessage("Bitstream IO: pin/IO timing checks refreshed — see Problems panel.");
+        }),
+
         vscode.commands.registerCommand("bitstream.runCdcLint", () => {
             const root = requireWorkspaceRoot();
             if (!root || !cdcLinter) { return; }
@@ -265,6 +294,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await syncManifest(root);
         registerHdlWatcher(context, root);
         registerStatusBar(context);
+        // Re-display the WNS badge from the previous build, if reports exist.
+        timingBadge?.refresh(root);
+        ioTiming?.refresh(root);
+        latchDetector?.refresh(root);
     } else {
         // No manifest yet: still register a watcher that adopts the workspace
         // the moment a wizard run drops `bitstream.json` into it.
