@@ -6,9 +6,9 @@
   <path d="M 15,12 L 15,68 C 45,68 68,56 68,40 C 68,24 45,12 15,12 Z"/>
   <!-- Inversion bubble -->
   <circle cx="74" cy="40" r="6"/>
-  <!-- Input stubs -->
-  <line x1="0"  y1="26" x2="15" y2="26"/>
-  <line x1="0"  y1="54" x2="15" y2="54"/>
+  <!-- Input stubs (grid-aligned: y=20, 60) -->
+  <line x1="0"  y1="20" x2="15" y2="20"/>
+  <line x1="0"  y1="60" x2="15" y2="60"/>
   <!-- Output stub (past bubble) -->
   <line x1="80" y1="40" x2="100" y2="40"/>
 </svg>

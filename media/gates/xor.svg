@@ -6,9 +6,9 @@
   <path d="M 15,12 C 42,12 72,25 72,40 C 72,55 42,68 15,68 Q 30,40 15,12 Z"/>
   <!-- Extra arc on left (XOR distinguishing mark) -->
   <path d="M 8,12 Q 23,40 8,68"/>
-  <!-- Input stubs -->
-  <line x1="0"  y1="26" x2="21" y2="26"/>
-  <line x1="0"  y1="54" x2="21" y2="54"/>
+  <!-- Input stubs (grid-aligned: y=20, 60) -->
+  <line x1="0"  y1="20" x2="18" y2="20"/>
+  <line x1="0"  y1="60" x2="18" y2="60"/>
   <!-- Output stub -->
   <line x1="72" y1="40" x2="100" y2="40"/>
 </svg>
