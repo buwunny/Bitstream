@@ -74,6 +74,9 @@ export class Toolchain {
             // so re-runs don't accumulate stale numbers.
             `report_utilization -file build/${manifest.project_name}_utilization.rpt`,
             `report_timing_summary -file build/${manifest.project_name}_timing.rpt`,
+            // Per-path detail for the Critical Path Inspector. -nworst N
+            // returns the N worst per endpoint; -max_paths caps the total.
+            `report_timing -nworst 1 -max_paths 25 -delay_type max -sort_by slack -input_pins -file build/${manifest.project_name}_timing_paths.rpt`,
             ``,
             `write_bitstream -force build/${manifest.project_name}.bit`,
             `exit`,

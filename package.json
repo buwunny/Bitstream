@@ -155,6 +155,11 @@
         "command": "bitstream.showRtlSchematic",
         "title": "Bitstream: Show RTL Schematic (Yosys)",
         "icon": "$(circuit-board)"
+      },
+      {
+        "command": "bitstream.showCriticalPaths",
+        "title": "Bitstream: Critical Path Inspector",
+        "icon": "$(list-tree)"
       }
     ],
     "viewsContainers": {
@@ -199,14 +204,19 @@
           "group": "navigation@4"
         },
         {
-          "command": "bitstream.refreshExplorer",
+          "command": "bitstream.showCriticalPaths",
           "when": "view == bitstream.projectExplorer",
           "group": "navigation@5"
         },
         {
-          "command": "bitstream.newProject",
+          "command": "bitstream.refreshExplorer",
           "when": "view == bitstream.projectExplorer",
           "group": "navigation@6"
+        },
+        {
+          "command": "bitstream.newProject",
+          "when": "view == bitstream.projectExplorer",
+          "group": "navigation@7"
         },
         {
           "command": "bitstream.openSettings",
