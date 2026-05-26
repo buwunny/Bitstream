@@ -191,6 +191,13 @@
         }
       ]
     },
+    "submenus": [
+      {
+        "id": "bitstream.analysisMenu",
+        "label": "Analysis & Reports",
+        "icon": "$(graph)"
+      }
+    ],
     "menus": {
       "view/title": [
         {
@@ -204,44 +211,46 @@
           "group": "navigation@2"
         },
         {
-          "command": "bitstream.showRtlSchematic",
+          "submenu": "bitstream.analysisMenu",
           "when": "view == bitstream.projectExplorer",
           "group": "navigation@3"
         },
         {
-          "command": "bitstream.showReportsDashboard",
-          "when": "view == bitstream.projectExplorer",
-          "group": "navigation@4"
-        },
-        {
-          "command": "bitstream.showCriticalPaths",
-          "when": "view == bitstream.projectExplorer",
-          "group": "navigation@5"
-        },
-        {
-          "command": "bitstream.runCdcLint",
-          "when": "view == bitstream.projectExplorer",
-          "group": "navigation@6"
-        },
-        {
-          "command": "bitstream.showBuildHistory",
-          "when": "view == bitstream.projectExplorer",
-          "group": "navigation@7"
-        },
-        {
           "command": "bitstream.refreshExplorer",
           "when": "view == bitstream.projectExplorer",
-          "group": "navigation@8"
-        },
-        {
-          "command": "bitstream.newProject",
-          "when": "view == bitstream.projectExplorer",
-          "group": "navigation@9"
+          "group": "navigation@4"
         },
         {
           "command": "bitstream.openSettings",
           "when": "view == bitstream.projectExplorer",
           "group": "navigation@99"
+        },
+        {
+          "command": "bitstream.newProject",
+          "when": "view == bitstream.projectExplorer",
+          "group": "1_project@1"
+        }
+      ],
+      "bitstream.analysisMenu": [
+        {
+          "command": "bitstream.showReportsDashboard",
+          "group": "1_analysis@1"
+        },
+        {
+          "command": "bitstream.showRtlSchematic",
+          "group": "1_analysis@2"
+        },
+        {
+          "command": "bitstream.showCriticalPaths",
+          "group": "1_analysis@3"
+        },
+        {
+          "command": "bitstream.runCdcLint",
+          "group": "1_analysis@4"
+        },
+        {
+          "command": "bitstream.showBuildHistory",
+          "group": "1_analysis@5"
         }
       ],
       "view/item/context": [
