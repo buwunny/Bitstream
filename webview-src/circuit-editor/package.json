@@ -1,0 +1,12 @@
+{
+  "name": "bitstream-circuit-editor-webview",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Webview UI bundle for the Bitstream circuit editor. Compiles to a single JS file consumed by src/editors/circuit_editor/circuit-webview.ts.",
+  "type": "module",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "typecheck": "tsc --noEmit"
+  }
+}

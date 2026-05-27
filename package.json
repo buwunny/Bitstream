@@ -347,8 +347,11 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "npm run build:webview && tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "build:webview": "node webview-src/circuit-editor/esbuild.config.mjs",
+    "watch:webview": "node webview-src/circuit-editor/esbuild.config.mjs --watch",
+    "typecheck:webview": "tsc -p webview-src/circuit-editor",
     "lint": "eslint src --ext ts"
   },
   "dependencies": {
@@ -358,6 +361,7 @@
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
+    "esbuild": "^0.21.5",
     "typescript": "^5.3.3"
   }
 }
