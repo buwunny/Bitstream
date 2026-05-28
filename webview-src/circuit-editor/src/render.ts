@@ -6,9 +6,12 @@ import { setDirty } from "./dirty";
 import { status, svgEl, viewport } from "./dom";
 import {
   bezier,
-  defaultZJoints,
+  defaultRouteJoints,
   insertWaypoint,
+  junctionPoints,
   manhattanGhostCorners,
+  simplifyWaypoints,
+  tapPointOnWire,
   wirePath,
 } from "./routing";
 import { syncColorPickerToSelection } from "./selection";
@@ -65,6 +68,24 @@ function _render(): void {
     if (hasColor) path.style.setProperty("--wire-color", w.color!);
     path.addEventListener("mousedown", (e) => {
       e.stopPropagation();
+      // Shift+click on a wire taps into its net: start a new pending wire
+      // from the same source, inheriting the existing wire's waypoints up
+      // to the click point so the new branch shares the same trunk.
+      if (e.shiftKey && !state.pendingWire) {
+        const tap = tapPointOnWire(w, clientToContent(e));
+        if (tap) {
+          state.pendingWire = {
+            from: { ...w.from },
+            mouse: tap.tap,
+            waypoints: [...tap.prefix, tap.tap],
+          };
+          state.selectedWire = null;
+          state.selectedNodes.clear();
+          syncColorPickerToSelection();
+          render();
+          return;
+        }
+      }
       state.selectedWire = w;
       state.selectedNodes.clear();
       syncColorPickerToSelection();
@@ -112,7 +133,7 @@ function _render(): void {
           });
         }
       } else {
-        const joints = defaultZJoints(a, b);
+        const joints = defaultRouteJoints(w);
         joints.forEach((wp, idx) => {
           const handle = svgEl("rect", {
             class: "waypoint ghost",
@@ -159,26 +180,13 @@ function _render(): void {
     renderNode(n, lod);
   }
 
-  // Junction markers: a filled dot at any output pin that drives 2+ wires.
-  // This is the only kind of electrical connection between wires in our
-  // model — input pins enforce a single driver, so anywhere else two wire
-  // paths visually meet is a crossing, not a connection.
-  const fanout = new Map<string, number>();
-  for (const w of state.doc.wires) {
-    if (!w.from || w.from.side !== "out") continue;
-    const key = `${w.from.id}:${w.from.pin}`;
-    fanout.set(key, (fanout.get(key) ?? 0) + 1);
-  }
-  for (const [key, count] of fanout) {
-    if (count < 2) continue;
-    const sep = key.indexOf(":");
-    const nodeId = key.slice(0, sep);
-    const pinIdx = parseInt(key.slice(sep + 1), 10);
-    if (culled.has(nodeId)) continue;
-    const node = state.doc.nodes.find((n) => n.id === nodeId);
-    if (!node) continue;
-    const p = pinPos(node, "out", pinIdx);
-    const r = pinWidth(node, "out", pinIdx) > 1 ? 4.5 : 3.5;
+  // Junction markers: a filled dot anywhere 3+ wire-branches converge.
+  // Each pin contributes one branch (its gate stub), each wire endpoint one
+  // branch, each interior waypoint two (in + out segments). A single wire's
+  // bend totals 2 — no dot. A Y-fanout at a pin (pin + 2 wires) is 3 — dot.
+  // A T-tap (endpoint + pass-through) is also 3 — dot.
+  for (const { p, busWidth } of junctionPoints()) {
+    const r = busWidth > 1 ? 4.5 : 3.5;
     viewport.appendChild(svgEl("circle", { class: "junction", cx: p.x, cy: p.y, r }));
   }
 
@@ -326,7 +334,11 @@ export function onPinDown(e: MouseEvent, node: CircuitNode, side: PinSide, idx: 
   }
   const a = state.pendingWire.from;
   const b = { id: node.id, pin: idx, side };
-  if (a.side === b.side || a.id === b.id) { state.pendingWire = null; render(); return; }
+  // Same side is invalid (out→out or in→in); a→a on the same exact pin is a
+  // no-op. Out→in on the same node IS allowed — that's a self-loop, routed
+  // around the gate by defaultRoute.
+  if (a.side === b.side) { state.pendingWire = null; render(); return; }
+  if (a.id === b.id && a.pin === b.pin) { state.pendingWire = null; render(); return; }
   const srcRef = a.side === "out" ? a : b;
   const dstRef = a.side === "in" ? a : b;
   // Reverse waypoints if the user drew the wire backwards (started from the sink).
@@ -357,6 +369,7 @@ export function onPinDown(e: MouseEvent, node: CircuitNode, side: PinSide, idx: 
   const wire: CircuitWire = { from: srcRef, to: dstRef };
   if (orderedWps.length) wire.waypoints = orderedWps;
   state.doc.wires.push(wire);
+  simplifyWaypoints(wire);
   setDirty(true);
   render();
 }

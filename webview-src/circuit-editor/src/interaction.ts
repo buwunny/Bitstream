@@ -5,6 +5,7 @@
 import { svg } from "./dom";
 import { setDirty } from "./dirty";
 import { render } from "./render";
+import { simplifyWaypoints } from "./routing";
 import { syncColorPickerToSelection } from "./selection";
 import { shapeOf } from "./shapes";
 import { HISTORY_LIMIT, orthogonalMode, snap, state } from "./state";
@@ -71,6 +72,13 @@ window.addEventListener("mouseup", () => {
       state.history.push(state.dragging.pre);
       if (state.history.length > HISTORY_LIMIT) state.history.shift();
       state.future.length = 0;
+      // Wires of moved nodes may now have waypoints that are colinear with
+      // their (new) pin positions; drop them so the path stays clean.
+      for (const w of state.doc.wires) {
+        if (state.selectedNodes.has(w.from.id) || state.selectedNodes.has(w.to.id)) {
+          simplifyWaypoints(w);
+        }
+      }
       setDirty(true);
     }
     state.dragging = null;
@@ -80,6 +88,7 @@ window.addEventListener("mouseup", () => {
       state.history.push(state.draggingWaypoint.pre);
       if (state.history.length > HISTORY_LIMIT) state.history.shift();
       state.future.length = 0;
+      simplifyWaypoints(state.draggingWaypoint.wire);
       setDirty(true);
     }
     state.draggingWaypoint = null;
