@@ -1,0 +1,1 @@
+//! Board-level rule checks.

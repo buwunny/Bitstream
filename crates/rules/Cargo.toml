@@ -1,0 +1,15 @@
+[package]
+name = "bitstream-rules"
+description = "Board-level rule checks for bitstream.toml"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bitstream-manifest.workspace = true
+bitstream-boards.workspace = true
+
+[lints]
+workspace = true

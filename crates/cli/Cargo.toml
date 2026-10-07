@@ -1,0 +1,22 @@
+[package]
+name = "bitstream-cli"
+description = "The bitstream command-line tool"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "bitstream"
+path = "src/main.rs"
+
+[dependencies]
+bitstream-manifest.workspace = true
+bitstream-boards.workspace = true
+bitstream-rules.workspace = true
+bitstream-constraints.workspace = true
+clap.workspace = true
+
+[lints]
+workspace = true

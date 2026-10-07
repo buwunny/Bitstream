@@ -36,3 +36,9 @@ Thumbs.db
 # Misc
 .cache/
 .turbo/
+
+# Rust
+target/
+
+# bitstream generated output
+build/
