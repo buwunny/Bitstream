@@ -629,4 +629,48 @@ signals = { "led[0]" = { pin = "a1", io_standard = "LVCMOS33", aliases = ["LD0"]
         assert!(hstl_dci.dci && hstl_dci.vref);
         assert_eq!(hstl_dci.bank_types, ["HP"]);
     }
+
+    #[test]
+    fn builtin_icebreaker_clock() {
+        let db = Database::from_files(EMBEDDED.iter().copied()).unwrap();
+        let t = db.target("icebreaker").unwrap();
+        assert_eq!(t.family.constraint_format, ConstraintFormat::Pcf);
+        // 12 MHz oscillator on pin 35, IOT_46b_G0 (iCEBreaker PCF, Lattice pinout).
+        let (name, clk) = t.board.signal("clk12").unwrap();
+        assert_eq!(name, "CLK");
+        assert!(clk.clock);
+        assert_eq!(clk.pin, "35");
+        let pin = t.device.pin(&clk.pin).unwrap();
+        assert_eq!(pin.name, "IOT_46b_G0");
+        assert_eq!(pin.clock.as_deref(), Some("GBIN"));
+        assert_eq!(t.board.signal("LEDR_N").unwrap().1.pin, "11");
+    }
+
+    #[test]
+    fn builtin_ice40up5k_sg48_pins() {
+        let db = Database::from_files(EMBEDDED.iter().copied()).unwrap();
+        let d = db.device("ice40up5k-sg48").unwrap();
+        assert_eq!(d.pins.len(), 49); // 48 pins plus the GND paddle
+
+        // GBIN G6 on pin 44, one leg of the pair with IOB_2a on pin 47.
+        let g6 = d.pin("44").unwrap();
+        assert_eq!(g6.name, "IOB_3b_G6");
+        assert_eq!(g6.clock.as_deref(), Some("GBIN"));
+        assert_eq!(g6.diff, Some(DiffSide::N));
+        assert_eq!(g6.pair.as_deref(), Some("47"));
+
+        let cdone = d.pin("7").unwrap();
+        assert_eq!(cdone.name, "CDONE");
+        assert_eq!(cdone.kind, PinKind::Config);
+        assert_eq!(d.pin("8").unwrap().kind, PinKind::Config);
+
+        // SPI configuration pin shared with user IO.
+        let so = d.pin("14").unwrap();
+        assert_eq!(so.name, "IOB_32a_SPI_SO");
+        assert_eq!(so.kind, PinKind::Io);
+        assert_eq!(so.config, ["SPI_SO"]);
+
+        assert_eq!(d.pin("39").unwrap().name, "RGB0");
+        assert_eq!(d.pin("paddle").unwrap().kind, PinKind::Ground);
+    }
 }
