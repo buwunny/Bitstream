@@ -39,8 +39,9 @@ kind    Decided from the pin name:
                                                  -> config
           XADC dedicated pins (ANALOG_PINS below) -> analog
           NC                                     -> nc
-          MGT* (GTP/GTX/GTH transceiver pins, including
-                MGTAVCC/MGTAVTT supplies)        -> other
+          MGTAVCC, MGTAVTT, MGTVCCAUX
+                (transceiver supplies)           -> power
+          other MGT* (transceiver pins)          -> other
           anything else                          -> other, with a warning on
                                                     stderr so it gets a deliberate
                                                     rule here.
@@ -190,6 +191,8 @@ def classify(name):
         return "config"
     if name in ANALOG_PINS:
         return "analog"
+    if name in ("MGTAVCC", "MGTAVTT", "MGTVCCAUX"):
+        return "power"
     if name.startswith("MGT"):
         return "other"
     print(f"{SCRIPT}: warning: no rule for pin name {name!r}, using kind = other", file=sys.stderr)
