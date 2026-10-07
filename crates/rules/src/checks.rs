@@ -65,7 +65,7 @@ pub fn io_standards(ports: &[ResolvedPort], t: Target<'_>) -> Vec<Diagnostic> {
             let mut d = Diagnostic::error(
                 "unknown-io-standard",
                 format!(
-                    "`{}` is not an IO standard of the {}",
+                    "`{}` is not in BITSTREAM.sh's IO standards for the {}",
                     choice.name, t.family.name
                 ),
             )
@@ -75,6 +75,12 @@ pub fn io_standards(ports: &[ResolvedPort], t: Target<'_>) -> Vec<Diagnostic> {
                 t.family.io_standards.iter().map(|s| s.name.as_str()),
             ) {
                 d = d.with_help(format!("did you mean `{s}`?"));
+            } else {
+                d = d.with_note(format!(
+                    "the list in boards/families/{}.toml comes from the vendor's IO documentation; \
+                     a standard the device supports but the list lacks must be added there with its source",
+                    t.family.id
+                ));
             }
             diags.push(d);
             continue;

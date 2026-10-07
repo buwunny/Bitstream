@@ -157,7 +157,7 @@ stable code:
 | `missing-location`, `conflicting-location`, `invalid-port`, `duplicate-port`, `invalid-diff-pair`, `invalid-dependency` | error | structural problems in `[pins]` / `[dependencies]` |
 | `unknown-board`, `part-mismatch` | error | board not in the database / `part` doesn't match the board's device |
 | `unknown-signal`, `unknown-pin` | error | no such board signal / package pin |
-| `unknown-io-standard` | error | IO standard not supported by the family |
+| `unknown-io-standard` | error | IO standard not in BITSTREAM.sh's data for the family |
 | `bank-voltage` | error | the IO standard needs a different VCCO than the bank provides (warning for unterminated differential inputs) |
 | `bank-type` | error | the IO standard isn't available in this bank type (e.g. LVDS in an HR bank) |
 | `unknown-bank-voltage` | warning | the board file doesn't record the bank's VCCO |

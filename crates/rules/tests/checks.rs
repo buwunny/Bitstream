@@ -352,7 +352,7 @@ fn unknown_io_standard_typo() {
         "unknown-io-standard",
         Severity::Error,
         "\"LVCMOS3\"",
-        "`LVCMOS3` is not an IO standard of the AMD 7 series",
+        "`LVCMOS3` is not in BITSTREAM.sh's IO standards for the AMD 7 series",
     );
     assert_eq!(help(d), "did you mean `LVCMOS33`?");
 }
