@@ -147,6 +147,9 @@ impl Diagnostic {
             }
         }
         by_line.sort_by_key(|(line, _)| *line);
+        for (_, labels) in &mut by_line {
+            labels.sort_by_key(|(_, _, pos)| pos.col);
+        }
 
         if !by_line.is_empty() {
             let _ = writeln!(out, "{pad} |");
