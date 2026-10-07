@@ -1,0 +1,200 @@
+id = "arty-a7-35"
+name = "Digilent Arty A7-35"
+vendor = "Digilent"
+device = "xc7a35t-csg324"
+part = "xc7a35ticsg324-1L"
+sources = [
+  { url = "https://github.com/Digilent/digilent-xdc/blob/00a3404901f35aa9567b01ecb3f2c233b6efe9f4/Arty-A7-35-Master.xdc", covers = "every signal: port name, PACKAGE_PIN, IOSTANDARD, clock, description" },
+  { url = "https://web.archive.org/web/20241107170454/https://digilent.com/reference/programmable-logic/arty-a7/reference-manual", covers = "part XC7A35TICSG324-1L (Purchasing Options table); LD4-LD7, BTN0-BTN3, SW0-SW3 and RESET aliases (Basic I/O figure, which also gives each one's FPGA pin); JA1..JD10 aliases (Pmod pin table); 3.3 V supplies FPGA I/O and 1.35 V the DDR3L bank (Table 3.1, section 5.1)" },
+  { url = "https://web.archive.org/web/20220308104453/https://digilent.com/reference/_media/reference/programmable-logic/arty-a7/arty_a7_sch.pdf", covers = "bank VCCO (Rev E.0): sheet 7 ties VCCO_0, 14, 15, 16 and 35 to VCC3V3 and VCCO_34 to DDRVCC; sheet 11 sets DDRVCC to 1.35 V (R261 not loaded, R266 loaded)" },
+  { url = "https://github.com/Digilent/vivado-boards/blob/36f34ab687b7fa9c778b779d027f3bce63b3ace9/new/board_files/arty-a7-35/E.0/1.1/board.xml", covers = "part xc7a35ticsg324-1L" },
+  { url = "https://github.com/litex-hub/litex-boards/blob/8215d8d9b4b23ed138b7e634bbf87ff2920c4221/litex_boards/platforms/digilent_arty.py", covers = "cross-check only: part xc7a35ticsg324-1L; DDR3 pins in bank 34 use SSTL135" },
+  { url = "https://www.xilinx.com/support/packagefiles/a7packages/xc7a35tcsg324pkg.txt", covers = "cross-check: every signal pin exists, is a user IO (IO_*) and has the pin name given in the XDC comment; banks 0, 14, 15, 16, 34, 35 exist" },
+]
+todo = [
+  "The master XDC sets neither CONFIG_VOLTAGE nor CFGBVS, so [config] is empty. VCCO_0 is 3.3 V per the schematic, but the CFGBVS strapping was not checked.",
+  "The master XDC has no DDR3L pins, so bank 34 (1.35 V) carries no signals here. LiteX's digilent_arty.py lists them.",
+  "The master XDC covers Rev. D and Rev. E boards; bank voltages come from the Rev E.0 schematic only.",
+  "vaux12_p/ck_a6 (B7), vaux12_n/ck_a7 (B6), vaux13_p/ck_a8 (E6), vaux13_n/ck_a9 (E5), vaux14_p/ck_a10 (A4) and vaux14_n/ck_a11 (A3) are alternative names for the same pins (analog or digital use, per the XDC). Both names are kept, as in the XDC. They must not be used together.",
+]
+
+[banks]
+"0" = { vcco = 3.3, source = "https://web.archive.org/web/20220308104453/https://digilent.com/reference/_media/reference/programmable-logic/arty-a7/arty_a7_sch.pdf" }
+"14" = { vcco = 3.3, source = "https://web.archive.org/web/20220308104453/https://digilent.com/reference/_media/reference/programmable-logic/arty-a7/arty_a7_sch.pdf" }
+"15" = { vcco = 3.3, source = "https://web.archive.org/web/20220308104453/https://digilent.com/reference/_media/reference/programmable-logic/arty-a7/arty_a7_sch.pdf" }
+"16" = { vcco = 3.3, source = "https://web.archive.org/web/20220308104453/https://digilent.com/reference/_media/reference/programmable-logic/arty-a7/arty_a7_sch.pdf" }
+"34" = { vcco = 1.35, source = "https://web.archive.org/web/20220308104453/https://digilent.com/reference/_media/reference/programmable-logic/arty-a7/arty_a7_sch.pdf" }
+"35" = { vcco = 3.3, source = "https://web.archive.org/web/20220308104453/https://digilent.com/reference/_media/reference/programmable-logic/arty-a7/arty_a7_sch.pdf" }
+
+# Aliases:
+# - LD4..LD7, BTN0..BTN3, SW0..SW3 and RESET (the red button on CK_RST) are the
+#   labels in the reference manual's Basic I/O figure. The figure gives each
+#   label's FPGA pin, and every one matches the pin of the XDC port that carries
+#   the alias. The RGB LEDs LD0..LD3 have three signals each, so they get no alias.
+# - JA1..JD10 are the Pmod connector pins from the reference manual's Pmod pin
+#   table (connector and pin number to FPGA pin), matched by FPGA pin.
+
+[signals]
+# Generated from Arty-A7-35-Master.xdc by scripts/gen_digilent_board.py. Edit only
+# `aliases` by hand; the script keeps them and regenerates everything else.
+CLK100MHZ = { pin = "E3", io_standard = "LVCMOS33", clock = true, description = "Clock signal: IO_L12P_T1_MRCC_35 Sch=gclk[100]" }
+"sw[0]" = { pin = "A8", io_standard = "LVCMOS33", aliases = ["SW0"], description = "Switches: IO_L12N_T1_MRCC_16 Sch=sw[0]" }
+"sw[1]" = { pin = "C11", io_standard = "LVCMOS33", aliases = ["SW1"], description = "Switches: IO_L13P_T2_MRCC_16 Sch=sw[1]" }
+"sw[2]" = { pin = "C10", io_standard = "LVCMOS33", aliases = ["SW2"], description = "Switches: IO_L13N_T2_MRCC_16 Sch=sw[2]" }
+"sw[3]" = { pin = "A10", io_standard = "LVCMOS33", aliases = ["SW3"], description = "Switches: IO_L14P_T2_SRCC_16 Sch=sw[3]" }
+led0_b = { pin = "E1", io_standard = "LVCMOS33", description = "RGB LEDs: IO_L18N_T2_35 Sch=led0_b" }
+led0_g = { pin = "F6", io_standard = "LVCMOS33", description = "RGB LEDs: IO_L19N_T3_VREF_35 Sch=led0_g" }
+led0_r = { pin = "G6", io_standard = "LVCMOS33", description = "RGB LEDs: IO_L19P_T3_35 Sch=led0_r" }
+led1_b = { pin = "G4", io_standard = "LVCMOS33", description = "RGB LEDs: IO_L20P_T3_35 Sch=led1_b" }
+led1_g = { pin = "J4", io_standard = "LVCMOS33", description = "RGB LEDs: IO_L21P_T3_DQS_35 Sch=led1_g" }
+led1_r = { pin = "G3", io_standard = "LVCMOS33", description = "RGB LEDs: IO_L20N_T3_35 Sch=led1_r" }
+led2_b = { pin = "H4", io_standard = "LVCMOS33", description = "RGB LEDs: IO_L21N_T3_DQS_35 Sch=led2_b" }
+led2_g = { pin = "J2", io_standard = "LVCMOS33", description = "RGB LEDs: IO_L22N_T3_35 Sch=led2_g" }
+led2_r = { pin = "J3", io_standard = "LVCMOS33", description = "RGB LEDs: IO_L22P_T3_35 Sch=led2_r" }
+led3_b = { pin = "K2", io_standard = "LVCMOS33", description = "RGB LEDs: IO_L23P_T3_35 Sch=led3_b" }
+led3_g = { pin = "H6", io_standard = "LVCMOS33", description = "RGB LEDs: IO_L24P_T3_35 Sch=led3_g" }
+led3_r = { pin = "K1", io_standard = "LVCMOS33", description = "RGB LEDs: IO_L23N_T3_35 Sch=led3_r" }
+"led[0]" = { pin = "H5", io_standard = "LVCMOS33", aliases = ["LD4"], description = "LEDs: IO_L24N_T3_35 Sch=led[4]" }
+"led[1]" = { pin = "J5", io_standard = "LVCMOS33", aliases = ["LD5"], description = "LEDs: IO_25_35 Sch=led[5]" }
+"led[2]" = { pin = "T9", io_standard = "LVCMOS33", aliases = ["LD6"], description = "LEDs: IO_L24P_T3_A01_D17_14 Sch=led[6]" }
+"led[3]" = { pin = "T10", io_standard = "LVCMOS33", aliases = ["LD7"], description = "LEDs: IO_L24N_T3_A00_D16_14 Sch=led[7]" }
+"btn[0]" = { pin = "D9", io_standard = "LVCMOS33", aliases = ["BTN0"], description = "Buttons: IO_L6N_T0_VREF_16 Sch=btn[0]" }
+"btn[1]" = { pin = "C9", io_standard = "LVCMOS33", aliases = ["BTN1"], description = "Buttons: IO_L11P_T1_SRCC_16 Sch=btn[1]" }
+"btn[2]" = { pin = "B9", io_standard = "LVCMOS33", aliases = ["BTN2"], description = "Buttons: IO_L11N_T1_SRCC_16 Sch=btn[2]" }
+"btn[3]" = { pin = "B8", io_standard = "LVCMOS33", aliases = ["BTN3"], description = "Buttons: IO_L12P_T1_MRCC_16 Sch=btn[3]" }
+"ja[0]" = { pin = "G13", io_standard = "LVCMOS33", aliases = ["JA1"], description = "Pmod Header JA: IO_0_15 Sch=ja[1]" }
+"ja[1]" = { pin = "B11", io_standard = "LVCMOS33", aliases = ["JA2"], description = "Pmod Header JA: IO_L4P_T0_15 Sch=ja[2]" }
+"ja[2]" = { pin = "A11", io_standard = "LVCMOS33", aliases = ["JA3"], description = "Pmod Header JA: IO_L4N_T0_15 Sch=ja[3]" }
+"ja[3]" = { pin = "D12", io_standard = "LVCMOS33", aliases = ["JA4"], description = "Pmod Header JA: IO_L6P_T0_15 Sch=ja[4]" }
+"ja[4]" = { pin = "D13", io_standard = "LVCMOS33", aliases = ["JA7"], description = "Pmod Header JA: IO_L6N_T0_VREF_15 Sch=ja[7]" }
+"ja[5]" = { pin = "B18", io_standard = "LVCMOS33", aliases = ["JA8"], description = "Pmod Header JA: IO_L10P_T1_AD11P_15 Sch=ja[8]" }
+"ja[6]" = { pin = "A18", io_standard = "LVCMOS33", aliases = ["JA9"], description = "Pmod Header JA: IO_L10N_T1_AD11N_15 Sch=ja[9]" }
+"ja[7]" = { pin = "K16", io_standard = "LVCMOS33", aliases = ["JA10"], description = "Pmod Header JA: IO_25_15 Sch=ja[10]" }
+"jb[0]" = { pin = "E15", io_standard = "LVCMOS33", aliases = ["JB1"], description = "Pmod Header JB: IO_L11P_T1_SRCC_15 Sch=jb_p[1]" }
+"jb[1]" = { pin = "E16", io_standard = "LVCMOS33", aliases = ["JB2"], description = "Pmod Header JB: IO_L11N_T1_SRCC_15 Sch=jb_n[1]" }
+"jb[2]" = { pin = "D15", io_standard = "LVCMOS33", aliases = ["JB3"], description = "Pmod Header JB: IO_L12P_T1_MRCC_15 Sch=jb_p[2]" }
+"jb[3]" = { pin = "C15", io_standard = "LVCMOS33", aliases = ["JB4"], description = "Pmod Header JB: IO_L12N_T1_MRCC_15 Sch=jb_n[2]" }
+"jb[4]" = { pin = "J17", io_standard = "LVCMOS33", aliases = ["JB7"], description = "Pmod Header JB: IO_L23P_T3_FOE_B_15 Sch=jb_p[3]" }
+"jb[5]" = { pin = "J18", io_standard = "LVCMOS33", aliases = ["JB8"], description = "Pmod Header JB: IO_L23N_T3_FWE_B_15 Sch=jb_n[3]" }
+"jb[6]" = { pin = "K15", io_standard = "LVCMOS33", aliases = ["JB9"], description = "Pmod Header JB: IO_L24P_T3_RS1_15 Sch=jb_p[4]" }
+"jb[7]" = { pin = "J15", io_standard = "LVCMOS33", aliases = ["JB10"], description = "Pmod Header JB: IO_L24N_T3_RS0_15 Sch=jb_n[4]" }
+"jc[0]" = { pin = "U12", io_standard = "LVCMOS33", aliases = ["JC1"], description = "Pmod Header JC: IO_L20P_T3_A08_D24_14 Sch=jc_p[1]" }
+"jc[1]" = { pin = "V12", io_standard = "LVCMOS33", aliases = ["JC2"], description = "Pmod Header JC: IO_L20N_T3_A07_D23_14 Sch=jc_n[1]" }
+"jc[2]" = { pin = "V10", io_standard = "LVCMOS33", aliases = ["JC3"], description = "Pmod Header JC: IO_L21P_T3_DQS_14 Sch=jc_p[2]" }
+"jc[3]" = { pin = "V11", io_standard = "LVCMOS33", aliases = ["JC4"], description = "Pmod Header JC: IO_L21N_T3_DQS_A06_D22_14 Sch=jc_n[2]" }
+"jc[4]" = { pin = "U14", io_standard = "LVCMOS33", aliases = ["JC7"], description = "Pmod Header JC: IO_L22P_T3_A05_D21_14 Sch=jc_p[3]" }
+"jc[5]" = { pin = "V14", io_standard = "LVCMOS33", aliases = ["JC8"], description = "Pmod Header JC: IO_L22N_T3_A04_D20_14 Sch=jc_n[3]" }
+"jc[6]" = { pin = "T13", io_standard = "LVCMOS33", aliases = ["JC9"], description = "Pmod Header JC: IO_L23P_T3_A03_D19_14 Sch=jc_p[4]" }
+"jc[7]" = { pin = "U13", io_standard = "LVCMOS33", aliases = ["JC10"], description = "Pmod Header JC: IO_L23N_T3_A02_D18_14 Sch=jc_n[4]" }
+"jd[0]" = { pin = "D4", io_standard = "LVCMOS33", aliases = ["JD1"], description = "Pmod Header JD: IO_L11N_T1_SRCC_35 Sch=jd[1]" }
+"jd[1]" = { pin = "D3", io_standard = "LVCMOS33", aliases = ["JD2"], description = "Pmod Header JD: IO_L12N_T1_MRCC_35 Sch=jd[2]" }
+"jd[2]" = { pin = "F4", io_standard = "LVCMOS33", aliases = ["JD3"], description = "Pmod Header JD: IO_L13P_T2_MRCC_35 Sch=jd[3]" }
+"jd[3]" = { pin = "F3", io_standard = "LVCMOS33", aliases = ["JD4"], description = "Pmod Header JD: IO_L13N_T2_MRCC_35 Sch=jd[4]" }
+"jd[4]" = { pin = "E2", io_standard = "LVCMOS33", aliases = ["JD7"], description = "Pmod Header JD: IO_L14P_T2_SRCC_35 Sch=jd[7]" }
+"jd[5]" = { pin = "D2", io_standard = "LVCMOS33", aliases = ["JD8"], description = "Pmod Header JD: IO_L14N_T2_SRCC_35 Sch=jd[8]" }
+"jd[6]" = { pin = "H2", io_standard = "LVCMOS33", aliases = ["JD9"], description = "Pmod Header JD: IO_L15P_T2_DQS_35 Sch=jd[9]" }
+"jd[7]" = { pin = "G2", io_standard = "LVCMOS33", aliases = ["JD10"], description = "Pmod Header JD: IO_L15N_T2_DQS_35 Sch=jd[10]" }
+uart_rxd_out = { pin = "D10", io_standard = "LVCMOS33", description = "USB-UART Interface: IO_L19N_T3_VREF_16 Sch=uart_rxd_out" }
+uart_txd_in = { pin = "A9", io_standard = "LVCMOS33", description = "USB-UART Interface: IO_L14N_T2_SRCC_16 Sch=uart_txd_in" }
+ck_io0 = { pin = "V15", io_standard = "LVCMOS33", description = "ChipKit Outer Digital Header: IO_L16P_T2_CSI_B_14 Sch=ck_io[0]" }
+ck_io1 = { pin = "U16", io_standard = "LVCMOS33", description = "ChipKit Outer Digital Header: IO_L18P_T2_A12_D28_14 Sch=ck_io[1]" }
+ck_io2 = { pin = "P14", io_standard = "LVCMOS33", description = "ChipKit Outer Digital Header: IO_L8N_T1_D12_14 Sch=ck_io[2]" }
+ck_io3 = { pin = "T11", io_standard = "LVCMOS33", description = "ChipKit Outer Digital Header: IO_L19P_T3_A10_D26_14 Sch=ck_io[3]" }
+ck_io4 = { pin = "R12", io_standard = "LVCMOS33", description = "ChipKit Outer Digital Header: IO_L5P_T0_D06_14 Sch=ck_io[4]" }
+ck_io5 = { pin = "T14", io_standard = "LVCMOS33", description = "ChipKit Outer Digital Header: IO_L14P_T2_SRCC_14 Sch=ck_io[5]" }
+ck_io6 = { pin = "T15", io_standard = "LVCMOS33", description = "ChipKit Outer Digital Header: IO_L14N_T2_SRCC_14 Sch=ck_io[6]" }
+ck_io7 = { pin = "T16", io_standard = "LVCMOS33", description = "ChipKit Outer Digital Header: IO_L15N_T2_DQS_DOUT_CSO_B_14 Sch=ck_io[7]" }
+ck_io8 = { pin = "N15", io_standard = "LVCMOS33", description = "ChipKit Outer Digital Header: IO_L11P_T1_SRCC_14 Sch=ck_io[8]" }
+ck_io9 = { pin = "M16", io_standard = "LVCMOS33", description = "ChipKit Outer Digital Header: IO_L10P_T1_D14_14 Sch=ck_io[9]" }
+ck_io10 = { pin = "V17", io_standard = "LVCMOS33", description = "ChipKit Outer Digital Header: IO_L18N_T2_A11_D27_14 Sch=ck_io[10]" }
+ck_io11 = { pin = "U18", io_standard = "LVCMOS33", description = "ChipKit Outer Digital Header: IO_L17N_T2_A13_D29_14 Sch=ck_io[11]" }
+ck_io12 = { pin = "R17", io_standard = "LVCMOS33", description = "ChipKit Outer Digital Header: IO_L12N_T1_MRCC_14 Sch=ck_io[12]" }
+ck_io13 = { pin = "P17", io_standard = "LVCMOS33", description = "ChipKit Outer Digital Header: IO_L12P_T1_MRCC_14 Sch=ck_io[13]" }
+ck_io26 = { pin = "U11", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_L19N_T3_A09_D25_VREF_14 Sch=ck_io[26]" }
+ck_io27 = { pin = "V16", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_L16N_T2_A15_D31_14 Sch=ck_io[27]" }
+ck_io28 = { pin = "M13", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_L6N_T0_D08_VREF_14 Sch=ck_io[28]" }
+ck_io29 = { pin = "R10", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_25_14 Sch=ck_io[29]" }
+ck_io30 = { pin = "R11", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_0_14 Sch=ck_io[30]" }
+ck_io31 = { pin = "R13", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_L5N_T0_D07_14 Sch=ck_io[31]" }
+ck_io32 = { pin = "R15", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_L13N_T2_MRCC_14 Sch=ck_io[32]" }
+ck_io33 = { pin = "P15", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_L13P_T2_MRCC_14 Sch=ck_io[33]" }
+ck_io34 = { pin = "R16", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_L15P_T2_DQS_RDWR_B_14 Sch=ck_io[34]" }
+ck_io35 = { pin = "N16", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_L11N_T1_SRCC_14 Sch=ck_io[35]" }
+ck_io36 = { pin = "N14", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_L8P_T1_D11_14 Sch=ck_io[36]" }
+ck_io37 = { pin = "U17", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_L17P_T2_A14_D30_14 Sch=ck_io[37]" }
+ck_io38 = { pin = "T18", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_L7N_T1_D10_14 Sch=ck_io[38]" }
+ck_io39 = { pin = "R18", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_L7P_T1_D09_14 Sch=ck_io[39]" }
+ck_io40 = { pin = "P18", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_L9N_T1_DQS_D13_14 Sch=ck_io[40]" }
+ck_io41 = { pin = "N17", io_standard = "LVCMOS33", description = "ChipKit Inner Digital Header: IO_L9P_T1_DQS_14 Sch=ck_io[41]" }
+vaux4_n = { pin = "C5", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Single-Ended Analog Inputs: IO_L1N_T0_AD4N_35 Sch=ck_an_n[0] ChipKit pin=A0" }
+vaux4_p = { pin = "C6", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Single-Ended Analog Inputs: IO_L1P_T0_AD4P_35 Sch=ck_an_p[0] ChipKit pin=A0" }
+vaux5_n = { pin = "A5", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Single-Ended Analog Inputs: IO_L3N_T0_DQS_AD5N_35 Sch=ck_an_n[1] ChipKit pin=A1" }
+vaux5_p = { pin = "A6", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Single-Ended Analog Inputs: IO_L3P_T0_DQS_AD5P_35 Sch=ck_an_p[1] ChipKit pin=A1" }
+vaux6_n = { pin = "B4", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Single-Ended Analog Inputs: IO_L7N_T1_AD6N_35 Sch=ck_an_n[2] ChipKit pin=A2" }
+vaux6_p = { pin = "C4", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Single-Ended Analog Inputs: IO_L7P_T1_AD6P_35 Sch=ck_an_p[2] ChipKit pin=A2" }
+vaux7_n = { pin = "A1", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Single-Ended Analog Inputs: IO_L9N_T1_DQS_AD7N_35 Sch=ck_an_n[3] ChipKit pin=A3" }
+vaux7_p = { pin = "B1", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Single-Ended Analog Inputs: IO_L9P_T1_DQS_AD7P_35 Sch=ck_an_p[3] ChipKit pin=A3" }
+vaux15_n = { pin = "B2", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Single-Ended Analog Inputs: IO_L10N_T1_AD15N_35 Sch=ck_an_n[4] ChipKit pin=A4" }
+vaux15_p = { pin = "B3", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Single-Ended Analog Inputs: IO_L10P_T1_AD15P_35 Sch=ck_an_p[4] ChipKit pin=A4" }
+vaux0_n = { pin = "C14", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Single-Ended Analog Inputs: IO_L1N_T0_AD0N_15 Sch=ck_an_n[5] ChipKit pin=A5" }
+vaux0_p = { pin = "D14", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Single-Ended Analog Inputs: IO_L1P_T0_AD0P_15 Sch=ck_an_p[5] ChipKit pin=A5" }
+ck_a0 = { pin = "F5", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Digital I/O: IO_0_35 Sch=ck_a[0] ChipKit pin=A0" }
+ck_a1 = { pin = "D8", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Digital I/O: IO_L4P_T0_35 Sch=ck_a[1] ChipKit pin=A1" }
+ck_a2 = { pin = "C7", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Digital I/O: IO_L4N_T0_35 Sch=ck_a[2] ChipKit pin=A2" }
+ck_a3 = { pin = "E7", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Digital I/O: IO_L6P_T0_35 Sch=ck_a[3] ChipKit pin=A3" }
+ck_a4 = { pin = "D7", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Digital I/O: IO_L6N_T0_VREF_35 Sch=ck_a[4] ChipKit pin=A4" }
+ck_a5 = { pin = "D5", io_standard = "LVCMOS33", description = "ChipKit Outer Analog Header - as Digital I/O: IO_L11P_T1_SRCC_35 Sch=ck_a[5] ChipKit pin=A5" }
+vaux12_p = { pin = "B7", io_standard = "LVCMOS33", description = "ChipKit Inner Analog Header - as Differential Analog Inputs: IO_L2P_T0_AD12P_35 Sch=ad_p[12] ChipKit pin=A6" }
+vaux12_n = { pin = "B6", io_standard = "LVCMOS33", description = "ChipKit Inner Analog Header - as Differential Analog Inputs: IO_L2N_T0_AD12N_35 Sch=ad_n[12] ChipKit pin=A7" }
+vaux13_p = { pin = "E6", io_standard = "LVCMOS33", description = "ChipKit Inner Analog Header - as Differential Analog Inputs: IO_L5P_T0_AD13P_35 Sch=ad_p[13] ChipKit pin=A8" }
+vaux13_n = { pin = "E5", io_standard = "LVCMOS33", description = "ChipKit Inner Analog Header - as Differential Analog Inputs: IO_L5N_T0_AD13N_35 Sch=ad_n[13] ChipKit pin=A9" }
+vaux14_p = { pin = "A4", io_standard = "LVCMOS33", description = "ChipKit Inner Analog Header - as Differential Analog Inputs: IO_L8P_T1_AD14P_35 Sch=ad_p[14] ChipKit pin=A10" }
+vaux14_n = { pin = "A3", io_standard = "LVCMOS33", description = "ChipKit Inner Analog Header - as Differential Analog Inputs: IO_L8N_T1_AD14N_35 Sch=ad_n[14] ChipKit pin=A11" }
+ck_a6 = { pin = "B7", io_standard = "LVCMOS33", description = "ChipKit Inner Analog Header - as Digital I/O: IO_L2P_T0_AD12P_35 Sch=ad_p[12] ChipKit pin=A6" }
+ck_a7 = { pin = "B6", io_standard = "LVCMOS33", description = "ChipKit Inner Analog Header - as Digital I/O: IO_L2N_T0_AD12N_35 Sch=ad_n[12] ChipKit pin=A7" }
+ck_a8 = { pin = "E6", io_standard = "LVCMOS33", description = "ChipKit Inner Analog Header - as Digital I/O: IO_L5P_T0_AD13P_35 Sch=ad_p[13] ChipKit pin=A8" }
+ck_a9 = { pin = "E5", io_standard = "LVCMOS33", description = "ChipKit Inner Analog Header - as Digital I/O: IO_L5N_T0_AD13N_35 Sch=ad_n[13] ChipKit pin=A9" }
+ck_a10 = { pin = "A4", io_standard = "LVCMOS33", description = "ChipKit Inner Analog Header - as Digital I/O: IO_L8P_T1_AD14P_35 Sch=ad_p[14] ChipKit pin=A10" }
+ck_a11 = { pin = "A3", io_standard = "LVCMOS33", description = "ChipKit Inner Analog Header - as Digital I/O: IO_L8N_T1_AD14N_35 Sch=ad_n[14] ChipKit pin=A11" }
+ck_miso = { pin = "G1", io_standard = "LVCMOS33", description = "ChipKit SPI: IO_L17N_T2_35 Sch=ck_miso" }
+ck_mosi = { pin = "H1", io_standard = "LVCMOS33", description = "ChipKit SPI: IO_L17P_T2_35 Sch=ck_mosi" }
+ck_sck = { pin = "F1", io_standard = "LVCMOS33", description = "ChipKit SPI: IO_L18P_T2_35 Sch=ck_sck" }
+ck_ss = { pin = "C1", io_standard = "LVCMOS33", description = "ChipKit SPI: IO_L16N_T2_35 Sch=ck_ss" }
+ck_scl = { pin = "L18", io_standard = "LVCMOS33", description = "ChipKit I2C: IO_L4P_T0_D04_14 Sch=ck_scl" }
+ck_sda = { pin = "M18", io_standard = "LVCMOS33", description = "ChipKit I2C: IO_L4N_T0_D05_14 Sch=ck_sda" }
+scl_pup = { pin = "A14", io_standard = "LVCMOS33", description = "ChipKit I2C: IO_L9N_T1_DQS_AD3N_15 Sch=scl_pup" }
+sda_pup = { pin = "A13", io_standard = "LVCMOS33", description = "ChipKit I2C: IO_L9P_T1_DQS_AD3P_15 Sch=sda_pup" }
+ck_ioa = { pin = "M17", io_standard = "LVCMOS33", description = "Misc. ChipKit Ports: IO_L10N_T1_D15_14 Sch=ck_ioa" }
+ck_rst = { pin = "C2", io_standard = "LVCMOS33", aliases = ["RESET"], description = "Misc. ChipKit Ports: IO_L16P_T2_35 Sch=ck_rst" }
+eth_col = { pin = "D17", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L16N_T2_A27_15 Sch=eth_col" }
+eth_crs = { pin = "G14", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L15N_T2_DQS_ADV_B_15 Sch=eth_crs" }
+eth_mdc = { pin = "F16", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L14N_T2_SRCC_15 Sch=eth_mdc" }
+eth_mdio = { pin = "K13", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L17P_T2_A26_15 Sch=eth_mdio" }
+eth_ref_clk = { pin = "G18", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L22P_T3_A17_15 Sch=eth_ref_clk" }
+eth_rstn = { pin = "C16", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L20P_T3_A20_15 Sch=eth_rstn" }
+eth_rx_clk = { pin = "F15", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L14P_T2_SRCC_15 Sch=eth_rx_clk" }
+eth_rx_dv = { pin = "G16", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L13N_T2_MRCC_15 Sch=eth_rx_dv" }
+"eth_rxd[0]" = { pin = "D18", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L21N_T3_DQS_A18_15 Sch=eth_rxd[0]" }
+"eth_rxd[1]" = { pin = "E17", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L16P_T2_A28_15 Sch=eth_rxd[1]" }
+"eth_rxd[2]" = { pin = "E18", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L21P_T3_DQS_15 Sch=eth_rxd[2]" }
+"eth_rxd[3]" = { pin = "G17", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L18N_T2_A23_15 Sch=eth_rxd[3]" }
+eth_rxerr = { pin = "C17", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L20N_T3_A19_15 Sch=eth_rxerr" }
+eth_tx_clk = { pin = "H16", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L13P_T2_MRCC_15 Sch=eth_tx_clk" }
+eth_tx_en = { pin = "H15", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L19N_T3_A21_VREF_15 Sch=eth_tx_en" }
+"eth_txd[0]" = { pin = "H14", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L15P_T2_DQS_15 Sch=eth_txd[0]" }
+"eth_txd[1]" = { pin = "J14", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L19P_T3_A22_15 Sch=eth_txd[1]" }
+"eth_txd[2]" = { pin = "J13", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L17N_T2_A25_15 Sch=eth_txd[2]" }
+"eth_txd[3]" = { pin = "H17", io_standard = "LVCMOS33", description = "SMSC Ethernet PHY: IO_L18P_T2_A24_15 Sch=eth_txd[3]" }
+qspi_cs = { pin = "L13", io_standard = "LVCMOS33", description = "Quad SPI Flash: IO_L6P_T0_FCS_B_14 Sch=qspi_cs" }
+"qspi_dq[0]" = { pin = "K17", io_standard = "LVCMOS33", description = "Quad SPI Flash: IO_L1P_T0_D00_MOSI_14 Sch=qspi_dq[0]" }
+"qspi_dq[1]" = { pin = "K18", io_standard = "LVCMOS33", description = "Quad SPI Flash: IO_L1N_T0_D01_DIN_14 Sch=qspi_dq[1]" }
+"qspi_dq[2]" = { pin = "L14", io_standard = "LVCMOS33", description = "Quad SPI Flash: IO_L2P_T0_D02_14 Sch=qspi_dq[2]" }
+"qspi_dq[3]" = { pin = "M14", io_standard = "LVCMOS33", description = "Quad SPI Flash: IO_L2N_T0_D03_14 Sch=qspi_dq[3]" }
+vsnsvu_n = { pin = "B17", io_standard = "LVCMOS33", description = "Power Measurements: IO_L7N_T1_AD2N_15 Sch=ad_n[2]" }
+vsnsvu_p = { pin = "B16", io_standard = "LVCMOS33", description = "Power Measurements: IO_L7P_T1_AD2P_15 Sch=ad_p[2]" }
+vsns5v0_n = { pin = "B12", io_standard = "LVCMOS33", description = "Power Measurements: IO_L3N_T0_DQS_AD1N_15 Sch=ad_n[1]" }
+vsns5v0_p = { pin = "C12", io_standard = "LVCMOS33", description = "Power Measurements: IO_L3P_T0_DQS_AD1P_15 Sch=ad_p[1]" }
+isns5v0_n = { pin = "F14", io_standard = "LVCMOS33", description = "Power Measurements: IO_L5N_T0_AD9N_15 Sch=ad_n[9]" }
+isns5v0_p = { pin = "F13", io_standard = "LVCMOS33", description = "Power Measurements: IO_L5P_T0_AD9P_15 Sch=ad_p[9]" }
+isns0v95_n = { pin = "A16", io_standard = "LVCMOS33", description = "Power Measurements: IO_L8N_T1_AD10N_15 Sch=ad_n[10]" }
+isns0v95_p = { pin = "A15", io_standard = "LVCMOS33", description = "Power Measurements: IO_L8P_T1_AD10P_15 Sch=ad_p[10]" }
