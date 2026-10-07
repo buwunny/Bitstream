@@ -1163,3 +1163,24 @@ clk = { pin = "D3", io_standard = "LVCMOS33", clock = true }
         report.diagnostics
     );
 }
+
+#[test]
+fn board_signal_pull_is_the_default() {
+    // The Basys 3 master XDC sets PULLUP true on PS2Clk.
+    let src = r#"
+[project]
+name = "t"
+top = "t"
+board = "basys3"
+
+[pins]
+ps2_clk = { signal = "PS2Clk" }
+ps2_data = { signal = "PS2Data", pull = "none" }
+"#;
+    let (m, _) = bitstream_manifest::Manifest::parse(src).unwrap();
+    let report = bitstream_rules::check(&m, bitstream_boards::Database::builtin());
+    assert!(report.diagnostics.is_empty(), "{:#?}", report.diagnostics);
+    let pull = |name: &str| report.ports.iter().find(|p| p.port == name).unwrap().pull;
+    assert_eq!(pull("ps2_clk"), Some(bitstream_manifest::Pull::Up));
+    assert_eq!(pull("ps2_data"), Some(bitstream_manifest::Pull::None));
+}

@@ -1,6 +1,6 @@
 //! Resolve `[pins]` entries to package pins on a board.
 
-use bitstream_boards::Target;
+use bitstream_boards::{SignalPull, Target};
 use bitstream_manifest::{Diagnostic, Manifest, PinAssignment, Pull, Slew, Span, Spanned};
 
 use crate::suggest::did_you_mean;
@@ -140,7 +140,14 @@ fn build(
         io_standard,
         clock,
         clock_span,
-        pull: a.pull.as_ref().map(|p| *p.get_ref()),
+        // The manifest wins; otherwise use the board's default for the signal.
+        pull: a.pull.as_ref().map(|p| *p.get_ref()).or_else(|| {
+            board_signal.and_then(|(_, s)| s.pull).map(|p| match p {
+                SignalPull::Up => Pull::Up,
+                SignalPull::Down => Pull::Down,
+                SignalPull::Keeper => Pull::Keeper,
+            })
+        }),
         slew: a.slew.as_ref().map(|s| *s.get_ref()),
         drive: a.drive.as_ref().map(|d| *d.get_ref()),
         diff_term: a.diff_term.as_ref().map(|d| *d.get_ref()),

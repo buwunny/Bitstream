@@ -7,7 +7,8 @@ Usage:
 Every `set_property -dict { PACKAGE_PIN ... }` line of the XDC becomes one signal,
 whether or not it is commented out (Digilent ships every line commented). The XDC
 port name is the signal key, verbatim. `clock = true` is set for ports that have a
-`create_clock` in the XDC. The description combines the XDC section heading and the
+`create_clock` in the XDC, and `pull = "up"`/`"down"`/`"keeper"` for ports whose
+XDC line sets PULLUP/PULLDOWN/KEEPER true. The description combines the XDC section heading and the
 line's trailing comment.
 
 Everything above the `[signals]` line of BOARD.toml is kept verbatim, and so are
@@ -60,6 +61,13 @@ def parse_xdc(text):
             if len(props) % 2:
                 sys.exit(f"line {lineno}: odd property list: {line}")
             props = dict(zip(props[0::2], props[1::2]))
+            pulls = [
+                v
+                for k, v in (("PULLUP", "up"), ("PULLDOWN", "down"), ("KEEPER", "keeper"))
+                if props.get(k, "").lower() == "true" and props.pop(k)
+            ]
+            if len(pulls) > 1:
+                sys.exit(f"line {lineno}: more than one pull setting: {line}")
             port = (m.group("p1") or m.group("p2")).strip()
             if "PACKAGE_PIN" not in props:
                 sys.exit(f"line {lineno}: no PACKAGE_PIN: {line}")
@@ -69,6 +77,7 @@ def parse_xdc(text):
                     "port": port,
                     "pin": props.pop("PACKAGE_PIN"),
                     "io_standard": props.pop("IOSTANDARD", None),
+                    "pull": pulls[0] if pulls else None,
                     "other": props,
                     "section": section,
                     "comment": " ".join(comment.split()),
@@ -110,6 +119,8 @@ def render(signals, clocks, aliases, xdc_name):
             fields.append(f"io_standard = {toml_str(s['io_standard'])}")
         if s["port"] in clocks:
             fields.append("clock = true")
+        if s["pull"]:
+            fields.append(f"pull = {toml_str(s['pull'])}")
         if aliases.get(s["port"]):
             fields.append(
                 "aliases = [" + ", ".join(toml_str(a) for a in aliases[s["port"]]) + "]"

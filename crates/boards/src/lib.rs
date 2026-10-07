@@ -201,8 +201,19 @@ pub struct BoardSignal {
     /// The signal is a clock source on the board.
     #[serde(default)]
     pub clock: bool,
+    /// Internal pull resistor set by the vendor's reference constraints.
+    #[serde(default)]
+    pub pull: Option<SignalPull>,
     #[serde(default)]
     pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SignalPull {
+    Up,
+    Down,
+    Keeper,
 }
 
 /// A board together with its device and family.

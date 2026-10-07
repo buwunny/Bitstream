@@ -100,4 +100,7 @@ cfgbvs = "VCCO"
 # Names follow the vendor's master constraint file; aliases add silkscreen labels.
 "led[0]" = { pin = "U16", io_standard = "LVCMOS33", aliases = ["LD0"] }
 clk = { pin = "W5", io_standard = "LVCMOS33", clock = true, aliases = ["CLK100MHZ"] }
+# pull = "up" | "down" | "keeper" copies a pull resistor from the vendor constraints;
+# it is the default for ports on that signal unless the manifest sets `pull`.
+PS2Clk = { pin = "C17", io_standard = "LVCMOS33", pull = "up" }
 ```

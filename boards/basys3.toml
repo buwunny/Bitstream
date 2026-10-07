@@ -13,7 +13,6 @@ sources = [
 ]
 todo = [
   "The master XDC header says it is for the Basys 3 rev B; bank voltages come from the Rev D.1 schematic. The signal pins were not compared pin by pin against the Rev D schematic, only against the reference manual figure (LEDs, switches, buttons, seven-segment display) and LiteX.",
-  "PS2Clk and PS2Data: the master XDC also sets PULLUP true, which the board model cannot express (recorded in their descriptions).",
 ]
 
 [config]
@@ -134,8 +133,8 @@ Hsync = { pin = "P19", io_standard = "LVCMOS33", description = "VGA Connector" }
 Vsync = { pin = "R19", io_standard = "LVCMOS33", description = "VGA Connector" }
 RsRx = { pin = "B18", io_standard = "LVCMOS33", description = "USB-RS232 Interface" }
 RsTx = { pin = "A18", io_standard = "LVCMOS33", description = "USB-RS232 Interface" }
-PS2Clk = { pin = "C17", io_standard = "LVCMOS33", description = "USB HID (PS/2); XDC also sets PULLUP true" }
-PS2Data = { pin = "B17", io_standard = "LVCMOS33", description = "USB HID (PS/2); XDC also sets PULLUP true" }
+PS2Clk = { pin = "C17", io_standard = "LVCMOS33", pull = "up", description = "USB HID (PS/2)" }
+PS2Data = { pin = "B17", io_standard = "LVCMOS33", pull = "up", description = "USB HID (PS/2)" }
 "QspiDB[0]" = { pin = "D18", io_standard = "LVCMOS33", description = "Quad SPI Flash" }
 "QspiDB[1]" = { pin = "D19", io_standard = "LVCMOS33", description = "Quad SPI Flash" }
 "QspiDB[2]" = { pin = "G18", io_standard = "LVCMOS33", description = "Quad SPI Flash" }

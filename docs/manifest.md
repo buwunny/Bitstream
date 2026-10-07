@@ -115,7 +115,7 @@ Optional settings:
 |-----|--------|---------|
 | `io_standard` | e.g. `LVCMOS33`, `LVDS_25` | defaults to the board signal's standard |
 | `clock` | `true`/`false` | the port is a clock and must use a clock-capable pin; board clock signals imply `true` |
-| `pull` | `up`, `down`, `keeper`, `none` | internal pull resistor |
+| `pull` | `up`, `down`, `keeper`, `none` | internal pull resistor; defaults to the board signal's pull (e.g. the Basys 3 PS/2 pins) |
 | `slew` | `slow`, `fast` | output slew rate (XDC only) |
 | `drive` | mA, e.g. `8` | output drive strength (XDC only) |
 | `diff_term` | `true`/`false` | internal differential termination (XDC only) |
