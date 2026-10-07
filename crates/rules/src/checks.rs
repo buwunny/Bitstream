@@ -388,10 +388,12 @@ pub fn config_pins(ports: &[ResolvedPort], t: Target<'_>) -> Vec<Diagnostic> {
             port.location_span.clone(),
             port.signal.is_some(),
         );
+        // A port given as `signal` can only take its N leg from `signal_n`, which is
+        // a board signal too.
         if let Some(n) = &port.pin_n
             && let Some(p) = t.device.pin(n.get_ref())
         {
-            check(p, n.span(), false);
+            check(p, n.span(), port.signal.is_some());
         }
     }
     diags

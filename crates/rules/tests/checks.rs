@@ -862,6 +862,28 @@ fn dual_purpose_pin_raw_ice40() {
     c.expect("dual-purpose-pin", Severity::Warning, "\"14\"", "SPI_SO");
 }
 
+#[test]
+fn dual_purpose_pin_n_leg() {
+    // L13 (IO_L6P_T0_FCS_B_14) pairs with M13 (IO_L6N_T0_D08_VREF_14), which is the
+    // board signal ck_io28. Through board signals neither leg warns.
+    check_pins(
+        "arty-a7-35",
+        "a = { signal = \"qspi_cs\", signal_n = \"ck_io28\", io_standard = \"TMDS_33\" }\n",
+    )
+    .assert_clean();
+    // As raw pins both legs do.
+    let c = check_pins(
+        "arty-a7-35",
+        "a = { pin = \"L13\", pin_n = \"M13\", io_standard = \"TMDS_33\" }\n",
+    );
+    let found: Vec<&str> = c
+        .all("dual-purpose-pin")
+        .into_iter()
+        .map(|d| c.primary(d))
+        .collect();
+    assert_eq!(found, ["\"L13\"", "\"M13\""], "{}", c.rendered());
+}
+
 // ---------------------------------------------------------------- duplicate-pin
 
 #[test]
