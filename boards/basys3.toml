@@ -1,0 +1,143 @@
+id = "basys3"
+name = "Digilent Basys 3"
+vendor = "Digilent"
+device = "xc7a35t-cpg236"
+part = "xc7a35tcpg236-1"
+sources = [
+  { url = "https://github.com/Digilent/digilent-xdc/blob/00a3404901f35aa9567b01ecb3f2c233b6efe9f4/Basys-3-Master.xdc", covers = "every signal: port name, PACKAGE_PIN, IOSTANDARD, clock, description; CONFIG_VOLTAGE and CFGBVS; JA1.., JB1.., JC1.., XA1_P.. aliases (\"Sch name\" comments)" },
+  { url = "https://web.archive.org/web/20250126000330/https://digilent.com/reference/programmable-logic/basys-3/reference-manual", covers = "LD0-LD15, SW0-SW15, BTNC/BTNU/BTNL/BTNR/BTND, CA-CG, DP and AN0-AN3 aliases (Basic I/O figure, which also gives each one's FPGA pin); 3.3 V supplies FPGA I/O (power table); part XC7A35T-1CPG236C; 100 MHz oscillator on W5" },
+  { url = "https://web.archive.org/web/20210828132548/https://digilent.com/reference/_media/reference/programmable-logic/basys-3/basys-3-sch-public-rev-d.pdf", covers = "bank VCCO: sheet 7 (FPGA POWER, Rev D.1) ties VCCO_0, VCCO_14, VCCO_16, VCCO_34 and VCCO_35 to VCC3V3" },
+  { url = "https://github.com/Digilent/vivado-boards/blob/36f34ab687b7fa9c778b779d027f3bce63b3ace9/new/board_files/basys3/C.0/board.xml", covers = "part xc7a35tcpg236-1" },
+  { url = "https://github.com/litex-hub/litex-boards/blob/8215d8d9b4b23ed138b7e634bbf87ff2920c4221/litex_boards/platforms/digilent_basys3.py", covers = "cross-check only: part xc7a35t-CPG236-1, every pin it uses appears in the master XDC, all LVCMOS33" },
+  { url = "https://www.xilinx.com/support/packagefiles/a7packages/xc7a35tcpg236pkg.txt", covers = "cross-check: every signal pin exists and is a user IO (IO_*); banks 0, 14, 16, 34, 35 exist (216 is a GTP quad without VCCO)" },
+]
+todo = [
+  "The master XDC header says it is for the Basys 3 rev B; bank voltages come from the Rev D.1 schematic. The signal pins were not compared pin by pin against the Rev D schematic, only against the reference manual figure (LEDs, switches, buttons, seven-segment display) and LiteX.",
+  "PS2Clk and PS2Data: the master XDC also sets PULLUP true, which the board model cannot express (recorded in their descriptions).",
+]
+
+[config]
+config_voltage = 3.3
+cfgbvs = "VCCO"
+
+[banks]
+"0" = { vcco = 3.3, source = "https://web.archive.org/web/20210828132548/https://digilent.com/reference/_media/reference/programmable-logic/basys-3/basys-3-sch-public-rev-d.pdf" }
+"14" = { vcco = 3.3, source = "https://web.archive.org/web/20210828132548/https://digilent.com/reference/_media/reference/programmable-logic/basys-3/basys-3-sch-public-rev-d.pdf" }
+"16" = { vcco = 3.3, source = "https://web.archive.org/web/20210828132548/https://digilent.com/reference/_media/reference/programmable-logic/basys-3/basys-3-sch-public-rev-d.pdf" }
+"34" = { vcco = 3.3, source = "https://web.archive.org/web/20210828132548/https://digilent.com/reference/_media/reference/programmable-logic/basys-3/basys-3-sch-public-rev-d.pdf" }
+"35" = { vcco = 3.3, source = "https://web.archive.org/web/20210828132548/https://digilent.com/reference/_media/reference/programmable-logic/basys-3/basys-3-sch-public-rev-d.pdf" }
+
+# Aliases:
+# - LDn, SWn, BTNx, CA..CG, DP and ANn are the labels in the reference manual's
+#   Basic I/O figure. The figure gives each label's FPGA pin, and every one
+#   matches the pin of the XDC port that carries the alias.
+# - JA1.., JB1.., JC1.. and XA1_P.. are the "Sch name" comments in the master XDC.
+
+[signals]
+# Generated from Basys-3-Master.xdc by scripts/gen_digilent_board.py. Edit only
+# `aliases` by hand; the script keeps them and regenerates everything else.
+clk = { pin = "W5", io_standard = "LVCMOS33", clock = true, description = "Clock signal" }
+"sw[0]" = { pin = "V17", io_standard = "LVCMOS33", aliases = ["SW0"], description = "Switches" }
+"sw[1]" = { pin = "V16", io_standard = "LVCMOS33", aliases = ["SW1"], description = "Switches" }
+"sw[2]" = { pin = "W16", io_standard = "LVCMOS33", aliases = ["SW2"], description = "Switches" }
+"sw[3]" = { pin = "W17", io_standard = "LVCMOS33", aliases = ["SW3"], description = "Switches" }
+"sw[4]" = { pin = "W15", io_standard = "LVCMOS33", aliases = ["SW4"], description = "Switches" }
+"sw[5]" = { pin = "V15", io_standard = "LVCMOS33", aliases = ["SW5"], description = "Switches" }
+"sw[6]" = { pin = "W14", io_standard = "LVCMOS33", aliases = ["SW6"], description = "Switches" }
+"sw[7]" = { pin = "W13", io_standard = "LVCMOS33", aliases = ["SW7"], description = "Switches" }
+"sw[8]" = { pin = "V2", io_standard = "LVCMOS33", aliases = ["SW8"], description = "Switches" }
+"sw[9]" = { pin = "T3", io_standard = "LVCMOS33", aliases = ["SW9"], description = "Switches" }
+"sw[10]" = { pin = "T2", io_standard = "LVCMOS33", aliases = ["SW10"], description = "Switches" }
+"sw[11]" = { pin = "R3", io_standard = "LVCMOS33", aliases = ["SW11"], description = "Switches" }
+"sw[12]" = { pin = "W2", io_standard = "LVCMOS33", aliases = ["SW12"], description = "Switches" }
+"sw[13]" = { pin = "U1", io_standard = "LVCMOS33", aliases = ["SW13"], description = "Switches" }
+"sw[14]" = { pin = "T1", io_standard = "LVCMOS33", aliases = ["SW14"], description = "Switches" }
+"sw[15]" = { pin = "R2", io_standard = "LVCMOS33", aliases = ["SW15"], description = "Switches" }
+"led[0]" = { pin = "U16", io_standard = "LVCMOS33", aliases = ["LD0"], description = "LEDs" }
+"led[1]" = { pin = "E19", io_standard = "LVCMOS33", aliases = ["LD1"], description = "LEDs" }
+"led[2]" = { pin = "U19", io_standard = "LVCMOS33", aliases = ["LD2"], description = "LEDs" }
+"led[3]" = { pin = "V19", io_standard = "LVCMOS33", aliases = ["LD3"], description = "LEDs" }
+"led[4]" = { pin = "W18", io_standard = "LVCMOS33", aliases = ["LD4"], description = "LEDs" }
+"led[5]" = { pin = "U15", io_standard = "LVCMOS33", aliases = ["LD5"], description = "LEDs" }
+"led[6]" = { pin = "U14", io_standard = "LVCMOS33", aliases = ["LD6"], description = "LEDs" }
+"led[7]" = { pin = "V14", io_standard = "LVCMOS33", aliases = ["LD7"], description = "LEDs" }
+"led[8]" = { pin = "V13", io_standard = "LVCMOS33", aliases = ["LD8"], description = "LEDs" }
+"led[9]" = { pin = "V3", io_standard = "LVCMOS33", aliases = ["LD9"], description = "LEDs" }
+"led[10]" = { pin = "W3", io_standard = "LVCMOS33", aliases = ["LD10"], description = "LEDs" }
+"led[11]" = { pin = "U3", io_standard = "LVCMOS33", aliases = ["LD11"], description = "LEDs" }
+"led[12]" = { pin = "P3", io_standard = "LVCMOS33", aliases = ["LD12"], description = "LEDs" }
+"led[13]" = { pin = "N3", io_standard = "LVCMOS33", aliases = ["LD13"], description = "LEDs" }
+"led[14]" = { pin = "P1", io_standard = "LVCMOS33", aliases = ["LD14"], description = "LEDs" }
+"led[15]" = { pin = "L1", io_standard = "LVCMOS33", aliases = ["LD15"], description = "LEDs" }
+"seg[0]" = { pin = "W7", io_standard = "LVCMOS33", aliases = ["CA"], description = "7 Segment Display" }
+"seg[1]" = { pin = "W6", io_standard = "LVCMOS33", aliases = ["CB"], description = "7 Segment Display" }
+"seg[2]" = { pin = "U8", io_standard = "LVCMOS33", aliases = ["CC"], description = "7 Segment Display" }
+"seg[3]" = { pin = "V8", io_standard = "LVCMOS33", aliases = ["CD"], description = "7 Segment Display" }
+"seg[4]" = { pin = "U5", io_standard = "LVCMOS33", aliases = ["CE"], description = "7 Segment Display" }
+"seg[5]" = { pin = "V5", io_standard = "LVCMOS33", aliases = ["CF"], description = "7 Segment Display" }
+"seg[6]" = { pin = "U7", io_standard = "LVCMOS33", aliases = ["CG"], description = "7 Segment Display" }
+dp = { pin = "V7", io_standard = "LVCMOS33", aliases = ["DP"], description = "7 Segment Display" }
+"an[0]" = { pin = "U2", io_standard = "LVCMOS33", aliases = ["AN0"], description = "7 Segment Display" }
+"an[1]" = { pin = "U4", io_standard = "LVCMOS33", aliases = ["AN1"], description = "7 Segment Display" }
+"an[2]" = { pin = "V4", io_standard = "LVCMOS33", aliases = ["AN2"], description = "7 Segment Display" }
+"an[3]" = { pin = "W4", io_standard = "LVCMOS33", aliases = ["AN3"], description = "7 Segment Display" }
+btnC = { pin = "U18", io_standard = "LVCMOS33", aliases = ["BTNC"], description = "Buttons" }
+btnU = { pin = "T18", io_standard = "LVCMOS33", aliases = ["BTNU"], description = "Buttons" }
+btnL = { pin = "W19", io_standard = "LVCMOS33", aliases = ["BTNL"], description = "Buttons" }
+btnR = { pin = "T17", io_standard = "LVCMOS33", aliases = ["BTNR"], description = "Buttons" }
+btnD = { pin = "U17", io_standard = "LVCMOS33", aliases = ["BTND"], description = "Buttons" }
+"JA[0]" = { pin = "J1", io_standard = "LVCMOS33", aliases = ["JA1"], description = "Pmod Header JA: Sch name = JA1" }
+"JA[1]" = { pin = "L2", io_standard = "LVCMOS33", aliases = ["JA2"], description = "Pmod Header JA: Sch name = JA2" }
+"JA[2]" = { pin = "J2", io_standard = "LVCMOS33", aliases = ["JA3"], description = "Pmod Header JA: Sch name = JA3" }
+"JA[3]" = { pin = "G2", io_standard = "LVCMOS33", aliases = ["JA4"], description = "Pmod Header JA: Sch name = JA4" }
+"JA[4]" = { pin = "H1", io_standard = "LVCMOS33", aliases = ["JA7"], description = "Pmod Header JA: Sch name = JA7" }
+"JA[5]" = { pin = "K2", io_standard = "LVCMOS33", aliases = ["JA8"], description = "Pmod Header JA: Sch name = JA8" }
+"JA[6]" = { pin = "H2", io_standard = "LVCMOS33", aliases = ["JA9"], description = "Pmod Header JA: Sch name = JA9" }
+"JA[7]" = { pin = "G3", io_standard = "LVCMOS33", aliases = ["JA10"], description = "Pmod Header JA: Sch name = JA10" }
+"JB[0]" = { pin = "A14", io_standard = "LVCMOS33", aliases = ["JB1"], description = "Pmod Header JB: Sch name = JB1" }
+"JB[1]" = { pin = "A16", io_standard = "LVCMOS33", aliases = ["JB2"], description = "Pmod Header JB: Sch name = JB2" }
+"JB[2]" = { pin = "B15", io_standard = "LVCMOS33", aliases = ["JB3"], description = "Pmod Header JB: Sch name = JB3" }
+"JB[3]" = { pin = "B16", io_standard = "LVCMOS33", aliases = ["JB4"], description = "Pmod Header JB: Sch name = JB4" }
+"JB[4]" = { pin = "A15", io_standard = "LVCMOS33", aliases = ["JB7"], description = "Pmod Header JB: Sch name = JB7" }
+"JB[5]" = { pin = "A17", io_standard = "LVCMOS33", aliases = ["JB8"], description = "Pmod Header JB: Sch name = JB8" }
+"JB[6]" = { pin = "C15", io_standard = "LVCMOS33", aliases = ["JB9"], description = "Pmod Header JB: Sch name = JB9" }
+"JB[7]" = { pin = "C16", io_standard = "LVCMOS33", aliases = ["JB10"], description = "Pmod Header JB: Sch name = JB10" }
+"JC[0]" = { pin = "K17", io_standard = "LVCMOS33", aliases = ["JC1"], description = "Pmod Header JC: Sch name = JC1" }
+"JC[1]" = { pin = "M18", io_standard = "LVCMOS33", aliases = ["JC2"], description = "Pmod Header JC: Sch name = JC2" }
+"JC[2]" = { pin = "N17", io_standard = "LVCMOS33", aliases = ["JC3"], description = "Pmod Header JC: Sch name = JC3" }
+"JC[3]" = { pin = "P18", io_standard = "LVCMOS33", aliases = ["JC4"], description = "Pmod Header JC: Sch name = JC4" }
+"JC[4]" = { pin = "L17", io_standard = "LVCMOS33", aliases = ["JC7"], description = "Pmod Header JC: Sch name = JC7" }
+"JC[5]" = { pin = "M19", io_standard = "LVCMOS33", aliases = ["JC8"], description = "Pmod Header JC: Sch name = JC8" }
+"JC[6]" = { pin = "P17", io_standard = "LVCMOS33", aliases = ["JC9"], description = "Pmod Header JC: Sch name = JC9" }
+"JC[7]" = { pin = "R18", io_standard = "LVCMOS33", aliases = ["JC10"], description = "Pmod Header JC: Sch name = JC10" }
+"JXADC[0]" = { pin = "J3", io_standard = "LVCMOS33", aliases = ["XA1_P"], description = "Pmod Header JXADC: Sch name = XA1_P" }
+"JXADC[1]" = { pin = "L3", io_standard = "LVCMOS33", aliases = ["XA2_P"], description = "Pmod Header JXADC: Sch name = XA2_P" }
+"JXADC[2]" = { pin = "M2", io_standard = "LVCMOS33", aliases = ["XA3_P"], description = "Pmod Header JXADC: Sch name = XA3_P" }
+"JXADC[3]" = { pin = "N2", io_standard = "LVCMOS33", aliases = ["XA4_P"], description = "Pmod Header JXADC: Sch name = XA4_P" }
+"JXADC[4]" = { pin = "K3", io_standard = "LVCMOS33", aliases = ["XA1_N"], description = "Pmod Header JXADC: Sch name = XA1_N" }
+"JXADC[5]" = { pin = "M3", io_standard = "LVCMOS33", aliases = ["XA2_N"], description = "Pmod Header JXADC: Sch name = XA2_N" }
+"JXADC[6]" = { pin = "M1", io_standard = "LVCMOS33", aliases = ["XA3_N"], description = "Pmod Header JXADC: Sch name = XA3_N" }
+"JXADC[7]" = { pin = "N1", io_standard = "LVCMOS33", aliases = ["XA4_N"], description = "Pmod Header JXADC: Sch name = XA4_N" }
+"vgaRed[0]" = { pin = "G19", io_standard = "LVCMOS33", description = "VGA Connector" }
+"vgaRed[1]" = { pin = "H19", io_standard = "LVCMOS33", description = "VGA Connector" }
+"vgaRed[2]" = { pin = "J19", io_standard = "LVCMOS33", description = "VGA Connector" }
+"vgaRed[3]" = { pin = "N19", io_standard = "LVCMOS33", description = "VGA Connector" }
+"vgaBlue[0]" = { pin = "N18", io_standard = "LVCMOS33", description = "VGA Connector" }
+"vgaBlue[1]" = { pin = "L18", io_standard = "LVCMOS33", description = "VGA Connector" }
+"vgaBlue[2]" = { pin = "K18", io_standard = "LVCMOS33", description = "VGA Connector" }
+"vgaBlue[3]" = { pin = "J18", io_standard = "LVCMOS33", description = "VGA Connector" }
+"vgaGreen[0]" = { pin = "J17", io_standard = "LVCMOS33", description = "VGA Connector" }
+"vgaGreen[1]" = { pin = "H17", io_standard = "LVCMOS33", description = "VGA Connector" }
+"vgaGreen[2]" = { pin = "G17", io_standard = "LVCMOS33", description = "VGA Connector" }
+"vgaGreen[3]" = { pin = "D17", io_standard = "LVCMOS33", description = "VGA Connector" }
+Hsync = { pin = "P19", io_standard = "LVCMOS33", description = "VGA Connector" }
+Vsync = { pin = "R19", io_standard = "LVCMOS33", description = "VGA Connector" }
+RsRx = { pin = "B18", io_standard = "LVCMOS33", description = "USB-RS232 Interface" }
+RsTx = { pin = "A18", io_standard = "LVCMOS33", description = "USB-RS232 Interface" }
+PS2Clk = { pin = "C17", io_standard = "LVCMOS33", description = "USB HID (PS/2); XDC also sets PULLUP true" }
+PS2Data = { pin = "B17", io_standard = "LVCMOS33", description = "USB HID (PS/2); XDC also sets PULLUP true" }
+"QspiDB[0]" = { pin = "D18", io_standard = "LVCMOS33", description = "Quad SPI Flash" }
+"QspiDB[1]" = { pin = "D19", io_standard = "LVCMOS33", description = "Quad SPI Flash" }
+"QspiDB[2]" = { pin = "G18", io_standard = "LVCMOS33", description = "Quad SPI Flash" }
+"QspiDB[3]" = { pin = "F18", io_standard = "LVCMOS33", description = "Quad SPI Flash" }
+QspiCSn = { pin = "K19", io_standard = "LVCMOS33", description = "Quad SPI Flash" }
