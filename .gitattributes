@@ -1,4 +1,4 @@
-# Golden files are compared byte for byte.
-*.xdc text eol=lf
-*.pcf text eol=lf
-*.toml text eol=lf
+# Check out text files with LF everywhere: golden files are compared byte for byte
+# and tests read docs and examples as text.
+* text=auto eol=lf
+*.pdf binary

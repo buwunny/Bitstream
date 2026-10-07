@@ -5,7 +5,7 @@ use bitstream_manifest::Manifest;
 
 #[test]
 fn manifest_reference_example_passes_check() {
-    let doc = include_str!("../../../docs/manifest.md");
+    let doc = include_str!("../../../docs/manifest.md").replace("\r\n", "\n");
     let section = &doc[doc.find("## Full example").expect("section exists")..];
     let start = section.find("```toml\n").expect("toml block") + "```toml\n".len();
     let example = &section[start..start + section[start..].find("```").unwrap()];
