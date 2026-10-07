@@ -13,7 +13,10 @@
 1. **Vendor builds and log parsing.** `bitstream build` drives the user's local
    Vivado (batch mode) and Yosys + nextpnr. Vivado, Yosys and nextpnr output is
    parsed into structured diagnostics with short explanations. Vendor tools are
-   never bundled or hosted. Quartus (QSF) follows later.
+   never bundled or hosted. Quartus (QSF) follows later. The first Vivado runs
+   must cover the XDC features no example uses yet (`PULLTYPE`, `SLEW`,
+   `DRIVE`, `DIFF_TERM`, and the `_p`/`_n` differential port naming); the PCF
+   output has already been placed and routed with Yosys + nextpnr.
 2. **Simulation with cocotb and FST output.** `bitstream sim` runs cocotb with
    Verilator (default for Verilog/SystemVerilog), Icarus (fallback), NVC (default
    for VHDL) or GHDL (optional). Waveforms are written as FST. GPL simulators run
