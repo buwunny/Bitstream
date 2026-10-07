@@ -30,3 +30,27 @@
    in CI.
 6. **Paid runner orchestration.** Hosted runners that run builds on
    customer-provided vendor tool installations.
+
+## Deferred data and rule work
+
+Each item waits for the milestone or need named in it.
+
+- **VREF checks** (with DDR/MIG support, before vendor builds rely on them).
+  Add the VREF voltage to each 7-series IO standard (UG471 Table 1-55) and an
+  optional external `vref` per board bank (from the schematic). Then check that
+  VREF standards in a bank agree, emit `INTERNAL_VREF` when the board has no
+  external VREF, and reject IO on VREF pins when VREF is external.
+- **Arty DDR3L pins in bank 34** (with DDR support). Source them from
+  Digilent's MIG project file and cross-check with LiteX `digilent_arty.py`.
+  They also exercise the 1.35 V bank and VREF checks.
+- **LVPECL_25** (on request). UG471 v1.10 doesn't list it; add it only with a
+  primary source.
+- **iCE40 differential inputs** (with a board that has a 2.5 V bank). Model
+  `SB_LVDS_INPUT` from Lattice's iCE40 Technology Library as a differential,
+  input-only standard. The SG48 bank-1 pair count disagrees between the pinout
+  XLSX (2) and the data sheet (4); recheck against newer Lattice revisions.
+- **Board revisions** (low priority). Add `revisions = [...]` to board files to
+  state which board revisions the data covers.
+- **Exact part matching** (with Quartus or another family). List orderable
+  parts per device from vendor ordering information and match `project.part`
+  exactly instead of by prefix.
