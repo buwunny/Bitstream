@@ -535,4 +535,98 @@ signals = { "led[0]" = { pin = "a1", io_standard = "LVCMOS33", aliases = ["LD0"]
             assert!(db.target(&board.id).is_some());
         }
     }
+
+    // Values below are read from the AMD package pinout files
+    // a7packages/xc7a35tcpg236pkg.txt and a7packages/xc7a35tcsg324pkg.txt.
+    #[test]
+    fn xc7a35t_cpg236_pins() {
+        let db = Database::from_files(EMBEDDED.iter().copied()).unwrap();
+        let d = db.device("xc7a35t-cpg236").unwrap();
+        assert_eq!(d.family, "xilinx-7series");
+        assert_eq!(d.pins.len(), 238);
+        assert_eq!(d.bank_type("34"), Some("HR"));
+
+        let w5 = d.pin("W5").unwrap();
+        assert_eq!(w5.name, "IO_L12P_T1_MRCC_34");
+        assert_eq!(w5.kind, PinKind::Io);
+        assert_eq!(w5.bank.as_deref(), Some("34"));
+        assert_eq!(w5.clock.as_deref(), Some("MRCC"));
+        assert_eq!(w5.diff, Some(DiffSide::P));
+        assert_eq!(w5.pair.as_deref(), Some("W4"));
+        let w4 = d.pin("W4").unwrap();
+        assert_eq!(w4.name, "IO_L12N_T1_MRCC_34");
+        assert_eq!(w4.diff, Some(DiffSide::N));
+        assert_eq!(w4.pair.as_deref(), Some("W5"));
+
+        let done = d.pin("U12").unwrap();
+        assert_eq!(done.name, "DONE_0");
+        assert_eq!(done.kind, PinKind::Config);
+        assert_eq!(done.bank.as_deref(), Some("0"));
+
+        let d18 = d.pin("D18").unwrap();
+        assert_eq!(d18.name, "IO_L1P_T0_D00_MOSI_14");
+        assert_eq!(d18.config, ["D00", "MOSI"]);
+
+        let v17 = d.pin("V17").unwrap();
+        assert_eq!(v17.name, "IO_L19N_T3_A09_D25_VREF_14");
+        assert!(v17.vref);
+        assert_eq!(v17.config, ["A09", "D25"]);
+
+        // IO_L6P_35 is not bonded out in this package, so L1 has no pair.
+        let l1 = d.pin("L1").unwrap();
+        assert_eq!(l1.name, "IO_L6N_T0_VREF_35");
+        assert_eq!((l1.diff, l1.pair.as_deref()), (None, None));
+
+        assert_eq!(d.pin("A12").unwrap().kind, PinKind::Analog); // VP_0
+        let b4 = d.pin("B4").unwrap();
+        assert_eq!(b4.name, "MGTPRXP0_216");
+        assert_eq!(b4.kind, PinKind::Other);
+    }
+
+    #[test]
+    fn xc7a35t_csg324_pins() {
+        let db = Database::from_files(EMBEDDED.iter().copied()).unwrap();
+        let d = db.device("xc7a35t-csg324").unwrap();
+        assert_eq!(d.pins.len(), 324);
+        assert_eq!(d.bank_type("15"), Some("HR"));
+
+        let e3 = d.pin("E3").unwrap();
+        assert_eq!(e3.name, "IO_L12P_T1_MRCC_35");
+        assert_eq!(e3.clock.as_deref(), Some("MRCC"));
+        assert_eq!(e3.pair.as_deref(), Some("D3"));
+
+        assert_eq!(d.pin("P9").unwrap().name, "PROGRAM_B_0");
+        assert_eq!(d.pin("P9").unwrap().kind, PinKind::Config);
+        assert_eq!(d.pin("N9").unwrap().kind, PinKind::Power); // VCCINT
+        assert_eq!(d.pin("G14").unwrap().config, ["ADV_B"]);
+        assert_eq!(d.pin("J15").unwrap().config, ["RS0"]);
+        assert_eq!(d.pin("L16").unwrap().config, ["EMCCLK"]);
+    }
+
+    // Values below are from AMD UG471 v1.10, Tables 1-55 and 1-56.
+    #[test]
+    fn xilinx_7series_io_standards() {
+        let db = Database::from_files(EMBEDDED.iter().copied()).unwrap();
+        let f = db.family("xilinx-7series").unwrap();
+        assert_eq!(f.constraint_format, ConstraintFormat::Xdc);
+
+        let lvds25 = f.io_standard("LVDS_25").unwrap();
+        assert_eq!(lvds25.vcco, Some(2.5));
+        assert_eq!(lvds25.bank_types, ["HR"]);
+        assert!(lvds25.differential && !lvds25.vref && !lvds25.dci);
+
+        assert_eq!(f.io_standard("LVDS").unwrap().bank_types, ["HP"]);
+        let lvcmos33 = f.io_standard("LVCMOS33").unwrap();
+        assert_eq!(
+            (lvcmos33.vcco, lvcmos33.bank_types.as_slice()),
+            (Some(3.3), &["HR".to_string()][..])
+        );
+        let sstl15 = f.io_standard("SSTL15").unwrap();
+        assert_eq!(sstl15.bank_types, ["HR", "HP"]);
+        assert!(sstl15.vref && !sstl15.dci && !sstl15.differential);
+        let hstl_dci = f.io_standard("HSTL_I_DCI").unwrap();
+        assert_eq!(hstl_dci.vcco, Some(1.5));
+        assert!(hstl_dci.dci && hstl_dci.vref);
+        assert_eq!(hstl_dci.bank_types, ["HP"]);
+    }
 }
