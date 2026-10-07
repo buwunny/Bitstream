@@ -89,7 +89,7 @@ dbg = { pin = "G13", io_standard = "LVCMOS33", slew = "fast", drive = 12 }
     let body: Vec<&str> = generated
         .contents
         .lines()
-        .filter(|l| l.starts_with("set_property"))
+        .filter(|l| l.contains("get_ports"))
         .collect();
     assert_eq!(
         body,

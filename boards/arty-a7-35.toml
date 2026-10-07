@@ -6,17 +6,21 @@ part = "xc7a35ticsg324-1L"
 sources = [
   { url = "https://github.com/Digilent/digilent-xdc/blob/00a3404901f35aa9567b01ecb3f2c233b6efe9f4/Arty-A7-35-Master.xdc", covers = "every signal: port name, PACKAGE_PIN, IOSTANDARD, clock, description" },
   { url = "https://web.archive.org/web/20241107170454/https://digilent.com/reference/programmable-logic/arty-a7/reference-manual", covers = "part XC7A35TICSG324-1L (Purchasing Options table); LD4-LD7, BTN0-BTN3, SW0-SW3 and RESET aliases (Basic I/O figure, which also gives each one's FPGA pin); JA1..JD10 aliases (Pmod pin table); 3.3 V supplies FPGA I/O and 1.35 V the DDR3L bank (Table 3.1, section 5.1)" },
-  { url = "https://web.archive.org/web/20220308104453/https://digilent.com/reference/_media/reference/programmable-logic/arty-a7/arty_a7_sch.pdf", covers = "bank VCCO (Rev E.0): sheet 7 ties VCCO_0, 14, 15, 16 and 35 to VCC3V3 and VCCO_34 to DDRVCC; sheet 11 sets DDRVCC to 1.35 V (R261 not loaded, R266 loaded)" },
+  { url = "https://web.archive.org/web/20220308104453/https://digilent.com/reference/_media/reference/programmable-logic/arty-a7/arty_a7_sch.pdf", covers = "bank VCCO (Rev E.0): sheet 7 ties VCCO_0, 14, 15, 16 and 35 to VCC3V3 and VCCO_34 to DDRVCC; sheet 11 sets DDRVCC to 1.35 V (R261 not loaded, R266 loaded); sheet 6 pulls CFGBVS_0 (P8) up to VCC3V3 through R178 4.7K, so CFGBVS = VCCO with CONFIG_VOLTAGE = VCCO_0 = 3.3 V" },
   { url = "https://github.com/Digilent/vivado-boards/blob/36f34ab687b7fa9c778b779d027f3bce63b3ace9/new/board_files/arty-a7-35/E.0/1.1/board.xml", covers = "part xc7a35ticsg324-1L" },
   { url = "https://github.com/litex-hub/litex-boards/blob/8215d8d9b4b23ed138b7e634bbf87ff2920c4221/litex_boards/platforms/digilent_arty.py", covers = "cross-check only: part xc7a35ticsg324-1L; DDR3 pins in bank 34 use SSTL135" },
   { url = "https://www.xilinx.com/support/packagefiles/a7packages/xc7a35tcsg324pkg.txt", covers = "cross-check: every signal pin exists, is a user IO (IO_*) and has the pin name given in the XDC comment; banks 0, 14, 15, 16, 34, 35 exist" },
 ]
 todo = [
-  "The master XDC sets neither CONFIG_VOLTAGE nor CFGBVS, so [config] is empty. VCCO_0 is 3.3 V per the schematic, but the CFGBVS strapping was not checked.",
   "The master XDC has no DDR3L pins, so bank 34 (1.35 V) carries no signals here. LiteX's digilent_arty.py lists them.",
   "The master XDC covers Rev. D and Rev. E boards; bank voltages come from the Rev E.0 schematic only.",
   "vaux12_p/ck_a6 (B7), vaux12_n/ck_a7 (B6), vaux13_p/ck_a8 (E6), vaux13_n/ck_a9 (E5), vaux14_p/ck_a10 (A4) and vaux14_n/ck_a11 (A3) are alternative names for the same pins (analog or digital use, per the XDC). Both names are kept, as in the XDC. They must not be used together.",
 ]
+
+[config]
+# Not in the master XDC; read from the schematic (sheet 6, CFGBVS_0 strap).
+config_voltage = 3.3
+cfgbvs = "VCCO"
 
 [banks]
 "0" = { vcco = 3.3, source = "https://web.archive.org/web/20220308104453/https://digilent.com/reference/_media/reference/programmable-logic/arty-a7/arty_a7_sch.pdf" }
