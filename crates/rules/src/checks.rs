@@ -331,7 +331,7 @@ pub fn clock_pins(ports: &[ResolvedPort], t: Target<'_>) -> Vec<Diagnostic> {
             .device
             .pins
             .iter()
-            .filter(|p| p.clock.is_some() && p.diff != Some(DiffSide::N) && p.bank == pin.bank)
+            .filter(|p| p.clock.is_some() && p.bank == pin.bank)
             .take(4)
             .map(|p| p.pin.clone())
             .collect();

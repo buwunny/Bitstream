@@ -1136,3 +1136,30 @@ b = { pin = "E15", io_standard = "LVCMOS33" }
     let codes: Vec<&str> = report.diagnostics.iter().map(|d| d.code).collect();
     assert_eq!(codes, ["diff-pair"], "{:#?}", report.diagnostics);
 }
+
+#[test]
+fn clock_pin_rejects_n_leg_of_clock_capable_pair() {
+    // D3 is IO_L12N_T1_MRCC_35 on the Arty; only its P leg E3 can take a
+    // single-ended clock (UG472).
+    let src = r#"
+[project]
+name = "t"
+top = "t"
+board = "arty-a7-35"
+
+[pins]
+clk = { pin = "D3", io_standard = "LVCMOS33", clock = true }
+"#;
+    let (m, _) = bitstream_manifest::Manifest::parse(src).unwrap();
+    let report = bitstream_rules::check(&m, bitstream_boards::Database::builtin());
+    let codes: Vec<&str> = report.diagnostics.iter().map(|d| d.code).collect();
+    assert_eq!(codes, ["clock-pin"], "{:#?}", report.diagnostics);
+    assert!(
+        report.diagnostics[0]
+            .help
+            .as_deref()
+            .is_some_and(|h| h.contains("E3")),
+        "{:#?}",
+        report.diagnostics
+    );
+}

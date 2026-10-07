@@ -52,7 +52,11 @@ diff/pair
         pin. Both legs must be bonded out in this package; a leg whose partner is
         absent from the file gets neither `diff` nor `pair`, since it cannot be
         used as a pair. IO_0_<bank> and IO_25_<bank> are single-ended.
-clock   "MRCC" or "SRCC" when that token appears in an IO pin name.
+clock   "MRCC" or "SRCC" when that token appears in the name of the P leg of
+        a pair. Only the P side of a clock-capable pair can take a single-ended
+        clock, and a differential clock is located by its P pin, so the N leg
+        never carries the flag (UG472 7 Series FPGAs Clocking Resources, section
+        "Clock-Capable Inputs": https://docs.amd.com/v/u/en-US/ug472_7Series_Clocking).
 config  Multi-function configuration pin functions found in an IO pin name, in
         the order they appear: D00..D31, A00..A28, MOSI, DIN, DOUT, FCS_B,
         FOE_B, FWE_B, ADV_B, RS0, RS1, CSI_B, CSO_B, RDWR_B, EMCCLK, PUDC_B.
@@ -233,6 +237,7 @@ def build_pins(rows):
                 fail(f"bank {bank} has both {bank_types[bank]} and {io_type} pins")
             tokens = io_tokens(name, bank)
             first = tokens[0]
+            side = None
             if m := PAIR_RE.match(first):
                 key = (bank, int(m.group(1)))
                 side = m.group(2)
@@ -246,7 +251,10 @@ def build_pins(rows):
                 if t in ("MRCC", "SRCC"):
                     if "clock" in pin:
                         fail(f"{name}: two clock tokens")
-                    pin["clock"] = t
+                    if side is None:
+                        fail(f"{name}: clock-capable pin outside a pair")
+                    if side == "P":
+                        pin["clock"] = t
                 elif t == "VREF":
                     pin["vref"] = True
                 elif t in ("VRN", "VRP"):
