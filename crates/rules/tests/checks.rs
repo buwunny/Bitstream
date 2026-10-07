@@ -1096,3 +1096,43 @@ fn bus_pins_expand_in_order() {
         .collect();
     assert_eq!(got, [("d[0]", "G13"), ("d[1]", "K16")]);
 }
+
+#[test]
+fn unsupported_setting_reported_once_per_bus() {
+    let src = r#"
+[project]
+name = "t"
+top = "t"
+board = "icebreaker"
+
+[pins]
+leds = { signals = ["LEDR_N", "LEDG_N"], slew = "fast" }
+"#;
+    let (m, _) = bitstream_manifest::Manifest::parse(src).unwrap();
+    let report = bitstream_rules::check(&m, bitstream_boards::Database::builtin());
+    let n = report
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == "unsupported-setting")
+        .count();
+    assert_eq!(n, 1, "{:#?}", report.diagnostics);
+}
+
+#[test]
+fn differential_port_on_n_leg_is_not_also_a_duplicate() {
+    // E16 is the N leg of E15 on the Arty (IO_L11N_T1_SRCC_15).
+    let src = r#"
+[project]
+name = "t"
+top = "t"
+board = "arty-a7-35"
+
+[pins]
+a = { pin = "E16", io_standard = "TMDS_33" }
+b = { pin = "E15", io_standard = "LVCMOS33" }
+"#;
+    let (m, _) = bitstream_manifest::Manifest::parse(src).unwrap();
+    let report = bitstream_rules::check(&m, bitstream_boards::Database::builtin());
+    let codes: Vec<&str> = report.diagnostics.iter().map(|d| d.code).collect();
+    assert_eq!(codes, ["diff-pair"], "{:#?}", report.diagnostics);
+}

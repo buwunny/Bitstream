@@ -409,9 +409,11 @@ pub fn duplicate_pins(ports: &[ResolvedPort], t: Target<'_>) -> Vec<Diagnostic> 
         if let Some(n) = &port.pin_n {
             legs.push((n.get_ref().clone(), n.span()));
         } else if standard(t, port).is_some_and(|s| s.differential)
+            && device_pin(t, port).diff == Some(DiffSide::P)
             && let Some(pair) = &device_pin(t, port).pair
         {
-            // The tools place the N leg implicitly.
+            // The tools place the N leg implicitly. A port on an N leg is already a
+            // `diff-pair` error, so don't report its partner as well.
             legs.push((pair.clone(), port.location_span.clone()));
         }
         for (pin, span) in legs {
@@ -490,7 +492,12 @@ pub fn unsupported_settings(ports: &[ResolvedPort], t: Target<'_>) -> Vec<Diagno
         return Vec::new();
     }
     let mut diags = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
     for port in ports {
+        // Bus bits share one manifest entry; report it once.
+        if !seen.insert(port.port_span.start) {
+            continue;
+        }
         let mut unsupported = Vec::new();
         if matches!(port.pull, Some(Pull::Down | Pull::Keeper)) {
             unsupported.push("a pull-down or keeper");
