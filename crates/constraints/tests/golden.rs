@@ -67,3 +67,37 @@ fn generation_is_deterministic() {
     let example = repo_root().join("examples/blinky/icebreaker");
     assert_eq!(generate(&example), generate(&example));
 }
+
+#[test]
+fn xdc_differential_and_io_settings() {
+    let source = r#"
+[project]
+name = "hdmi"
+top = "hdmi"
+board = "arty-a7-35"
+
+[pins]
+tmds = { signal = "jb[0]", io_standard = "TMDS_33" }
+"btn[1]" = { signal = "btn[1]", pull = "down" }
+dbg = { pin = "G13", io_standard = "LVCMOS33", slew = "fast", drive = 12 }
+"#;
+    let (manifest, _) = Manifest::parse(source).unwrap();
+    let report = bitstream_rules::check(&manifest, Database::builtin());
+    assert!(!report.has_errors(), "{:#?}", report.diagnostics);
+    let generated =
+        bitstream_constraints::generate(&manifest, report.target.unwrap(), &report.ports);
+    let body: Vec<&str> = generated
+        .contents
+        .lines()
+        .filter(|l| l.starts_with("set_property"))
+        .collect();
+    assert_eq!(
+        body,
+        [
+            "set_property -dict { PACKAGE_PIN C9 IOSTANDARD LVCMOS33 PULLTYPE PULLDOWN } [get_ports { btn[1] }]",
+            "set_property -dict { PACKAGE_PIN G13 IOSTANDARD LVCMOS33 SLEW FAST DRIVE 12 } [get_ports { dbg }]",
+            "set_property -dict { PACKAGE_PIN E15 IOSTANDARD TMDS_33 } [get_ports { tmds_p }]",
+            "set_property -dict { PACKAGE_PIN E16 IOSTANDARD TMDS_33 } [get_ports { tmds_n }]",
+        ]
+    );
+}
