@@ -236,6 +236,18 @@ fn unknown_signal_typo_suggests_close_name() {
 }
 
 #[test]
+fn package_pin_given_as_signal_suggests_pin() {
+    // W5 is the Basys 3 clock pin; it is one edit away from the alias SW5, but an
+    // exact package pin match is the better hint.
+    let c = check_pins("basys3", "clk = { signal = \"W5\" }\n");
+    let d = c.expect("unknown-signal", Severity::Error, "\"W5\"", "`W5`");
+    assert_eq!(
+        help(d),
+        "`W5` is a package pin; use `pin = \"W5\"` instead of `signal`"
+    );
+}
+
+#[test]
 fn unknown_signal_far_from_everything_points_at_board_file() {
     let c = check_pins("basys3", "x = { signal = \"hdmi_tx_clk_p\" }\n");
     let d = c.expect(

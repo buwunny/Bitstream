@@ -165,12 +165,13 @@ fn resolve_signal(
         format!("`{name}` is not a signal on the {}", target.board.name),
     )
     .with_primary(loc.span(), "unknown board signal");
-    if let Some(s) = did_you_mean(name, target.board.signal_names()) {
-        d = d.with_help(format!("did you mean `{s}`?"));
-    } else if target.device.pin(name).is_some() {
+    // An exact package pin beats a fuzzy signal match (`W5` is not a typo of `SW5`).
+    if target.device.pin(name).is_some() {
         d = d.with_help(format!(
             "`{name}` is a package pin; use `pin = \"{name}\"` instead of `signal`"
         ));
+    } else if let Some(s) = did_you_mean(name, target.board.signal_names()) {
+        d = d.with_help(format!("did you mean `{s}`?"));
     } else {
         d = d.with_help(format!(
             "board signals are listed in boards/{}.toml",
