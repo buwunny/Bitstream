@@ -159,11 +159,18 @@ fn bank_voltage_help(t: Target<'_>, std: &IoStandard, bank: &str, vcco: f64) -> 
         .map(|s| s.name.as_str())
         .collect();
     let required = std.vcco.unwrap_or_default();
+    // Only banks with user IO are somewhere to move a port to (not 7-series bank 0).
+    let has_user_io = |bank: &str| {
+        t.device
+            .pins
+            .iter()
+            .any(|p| p.kind == PinKind::Io && p.bank.as_deref() == Some(bank))
+    };
     let matching_banks: Vec<&str> = t
         .board
         .banks
         .iter()
-        .filter(|(_, b)| (b.vcco - required).abs() < 1e-6)
+        .filter(|(k, b)| (b.vcco - required).abs() < 1e-6 && has_user_io(k))
         .map(|(k, _)| k.as_str())
         .collect();
 

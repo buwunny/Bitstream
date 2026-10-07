@@ -460,6 +460,11 @@ fn bank_voltage_lvcmos33_on_1v35_bank() {
         "bank 34 is powered at 1.35 V",
     );
     assert_eq!(c.secondaries(d), ["\"L1\""]);
+    // Bank 0 is also at 3.3 V but holds only configuration pins on the CSG324.
+    assert_eq!(
+        help(d),
+        "no IO standard works at 1.35 V in this bank; or move the port to bank 14/15/16/35 (3.3 V)"
+    );
 }
 
 #[test]
