@@ -1,0 +1,96 @@
+id = "icebreaker"
+name = "1BitSquared iCEBreaker"
+vendor = "1BitSquared"
+device = "ice40up5k-sg48"
+part = "ice40up5k-sg48"
+sources = [
+  { url = "https://github.com/icebreaker-fpga/icebreaker-examples/blob/8d0892bf62dd5d8ae59c48c882d9ebebd1cab9c2/icebreaker/icebreaker.pcf", covers = "signal names and pins" },
+  { url = "https://github.com/icebreaker-fpga/icebreaker/blob/7ac3d6c14d49333f3d588c4c2785ff4d2ee8614a/hardware/v1.0e/icebreaker-sch.pdf", covers = "bank VCCIO, 12 MHz oscillator, LED and button polarity (schematic V1.0e)" },
+  { url = "https://github.com/litex-hub/litex-boards/blob/dfcfe31570fbd1620c681525aa43fc5eba097ae3/litex_boards/platforms/icebreaker.py", covers = "cross-check of pins; LiteX names used as aliases" },
+  { url = "https://github.com/enjoy-digital/litex/blob/60c089f4ff02bbd3d014f682b4a18b7329938037/litex/build/pmod.py", covers = "cross-check of the break-off Pmod LEDs and buttons (Pmod1BitSquaredBreakOff)" },
+]
+todo = [
+  "Differential/LVDS use is not covered: the iCE40 family file names no differential IO standard.",
+]
+
+# Schematic V1.0e: VCCIO_0 (pin 33) and SPI_VCCIO1 (pin 22) share net VCCIO_0|1,
+# fed from +3V3 through the normally closed solder jumper J19. VCCIO_2 (pin 1) is
+# fed through J17, a double jumper whose normally closed side is +3V3 and normally
+# open side is +1V8; the values below are the as-shipped jumper settings.
+[banks]
+"0" = { vcco = 3.3, source = "https://github.com/icebreaker-fpga/icebreaker/blob/7ac3d6c14d49333f3d588c4c2785ff4d2ee8614a/hardware/v1.0e/icebreaker-sch.pdf" }
+"1" = { vcco = 3.3, source = "https://github.com/icebreaker-fpga/icebreaker/blob/7ac3d6c14d49333f3d588c4c2785ff4d2ee8614a/hardware/v1.0e/icebreaker-sch.pdf" }
+"2" = { vcco = 3.3, source = "https://github.com/icebreaker-fpga/icebreaker/blob/7ac3d6c14d49333f3d588c4c2785ff4d2ee8614a/hardware/v1.0e/icebreaker-sch.pdf" }
+
+# Names are the PCF's, verbatim. The PCF gives some pins two names (the RGB LED
+# pins, and Pmod 2 pins shared with the break-off LEDs and buttons); each name is
+# kept as its own signal. io_standard is LVCMOS33 because every bank is 3.3 V;
+# it is left off the RGB pins, which are open-drain LED current sinks.
+[signals]
+# 12 MHz clock (oscillator U7, net FTDI_CLK)
+CLK = { pin = "35", io_standard = "LVCMOS33", clock = true, aliases = ["clk12"], description = "12 MHz oscillator" }
+
+# RS232 (to the FTDI USB bridge)
+RX = { pin = "6", io_standard = "LVCMOS33", description = "UART receive" }
+TX = { pin = "9", io_standard = "LVCMOS33", description = "UART transmit" }
+
+# LEDs and button
+BTN_N = { pin = "10", io_standard = "LVCMOS33", aliases = ["user_btn_n"], description = "User button, active low (10k pull-up)" }
+LEDR_N = { pin = "11", io_standard = "LVCMOS33", aliases = ["user_ledr_n"], description = "Red LED, active low" }
+LEDG_N = { pin = "37", io_standard = "LVCMOS33", aliases = ["user_ledg_n"], description = "Green LED, active low" }
+
+# RGB LED driver (RGB0..RGB2 open-drain sinks)
+LED_RED_N = { pin = "39", description = "RGB LED red, active low (RGB0)" }
+LED_GRN_N = { pin = "40", description = "RGB LED green, active low (RGB1)" }
+LED_BLU_N = { pin = "41", description = "RGB LED blue, active low (RGB2)" }
+"LED_RGB[0]" = { pin = "39", description = "Same pin as LED_RED_N" }
+"LED_RGB[1]" = { pin = "40", description = "Same pin as LED_GRN_N" }
+"LED_RGB[2]" = { pin = "41", description = "Same pin as LED_BLU_N" }
+
+# SPI flash
+FLASH_SCK = { pin = "15", io_standard = "LVCMOS33" }
+FLASH_SSB = { pin = "16", io_standard = "LVCMOS33" }
+FLASH_IO0 = { pin = "14", io_standard = "LVCMOS33" }
+FLASH_IO1 = { pin = "17", io_standard = "LVCMOS33" }
+FLASH_IO2 = { pin = "12", io_standard = "LVCMOS33" }
+FLASH_IO3 = { pin = "13", io_standard = "LVCMOS33" }
+
+# Pmod 1A
+P1A1 = { pin = "4", io_standard = "LVCMOS33" }
+P1A2 = { pin = "2", io_standard = "LVCMOS33" }
+P1A3 = { pin = "47", io_standard = "LVCMOS33" }
+P1A4 = { pin = "45", io_standard = "LVCMOS33" }
+P1A7 = { pin = "3", io_standard = "LVCMOS33" }
+P1A8 = { pin = "48", io_standard = "LVCMOS33" }
+P1A9 = { pin = "46", io_standard = "LVCMOS33" }
+P1A10 = { pin = "44", io_standard = "LVCMOS33" }
+
+# Pmod 1B
+P1B1 = { pin = "43", io_standard = "LVCMOS33" }
+P1B2 = { pin = "38", io_standard = "LVCMOS33" }
+P1B3 = { pin = "34", io_standard = "LVCMOS33" }
+P1B4 = { pin = "31", io_standard = "LVCMOS33" }
+P1B7 = { pin = "42", io_standard = "LVCMOS33" }
+P1B8 = { pin = "36", io_standard = "LVCMOS33" }
+P1B9 = { pin = "32", io_standard = "LVCMOS33" }
+P1B10 = { pin = "28", io_standard = "LVCMOS33" }
+
+# Pmod 2
+P2_1 = { pin = "27", io_standard = "LVCMOS33" }
+P2_2 = { pin = "25", io_standard = "LVCMOS33" }
+P2_3 = { pin = "21", io_standard = "LVCMOS33" }
+P2_4 = { pin = "19", io_standard = "LVCMOS33" }
+P2_7 = { pin = "26", io_standard = "LVCMOS33" }
+P2_8 = { pin = "23", io_standard = "LVCMOS33" }
+P2_9 = { pin = "20", io_standard = "LVCMOS33" }
+P2_10 = { pin = "18", io_standard = "LVCMOS33" }
+
+# LEDs and buttons on the break-off section (Pmod 2 pins)
+LED1 = { pin = "26", io_standard = "LVCMOS33", description = "Break-off LED 1, on P2_7" }
+LED2 = { pin = "27", io_standard = "LVCMOS33", description = "Break-off LED 2, on P2_1" }
+LED3 = { pin = "25", io_standard = "LVCMOS33", description = "Break-off LED 3, on P2_2" }
+LED4 = { pin = "23", io_standard = "LVCMOS33", description = "Break-off LED 4, on P2_8" }
+LED5 = { pin = "21", io_standard = "LVCMOS33", description = "Break-off LED 5, on P2_3" }
+BTN1 = { pin = "20", io_standard = "LVCMOS33", description = "Break-off button 1, on P2_9" }
+BTN2 = { pin = "19", io_standard = "LVCMOS33", description = "Break-off button 2, on P2_4" }
+BTN3 = { pin = "18", io_standard = "LVCMOS33", description = "Break-off button 3, on P2_10" }

@@ -1,0 +1,11 @@
+[project]
+name = "blinky"
+top = "blinky"
+board = "icebreaker"
+
+[sources]
+files = ["rtl/blinky.v"]
+
+[pins]
+clk = { signal = "CLK" }       # 12 MHz oscillator
+led_n = { signal = "LEDR_N" }  # red user LED, active low

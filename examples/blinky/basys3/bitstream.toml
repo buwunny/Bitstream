@@ -1,0 +1,12 @@
+[project]
+name = "blinky"
+top = "blinky"
+board = "basys3"
+
+[sources]
+files = ["rtl/blinky.v"]
+
+[pins]
+clk = { signal = "clk" }                            # 100 MHz oscillator
+rst = { signal = "BTNC" }                           # centre button
+led = { signals = ["LD0", "LD1", "LD2", "LD3"] }

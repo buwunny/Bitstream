@@ -1,0 +1,118 @@
+# AMD 7 series (Spartan-7, Artix-7, Kintex-7, Virtex-7, Zynq 7000 PL) family data.
+#
+# io_standards is transcribed from AMD UG471 "7 Series FPGAs SelectIO Resources
+# User Guide", v1.10, May 8, 2018:
+#   Table 1-55 "VCCO and VREF Requirements for Each Supported I/O Standard" (pp. 98-100):
+#     name, bank_types ("I/O Bank Availability"; Both = HR and HP), vcco (the
+#     "VCCO Output" column) and vref (true when the "VREF Input" column is not N/A).
+#   Table 1-56 "DRIVE and SLEW Attributes, Bidirectional Buffers, and DCI Termination
+#     Type" (pp. 101-103): dci is true when the output or input DCI type is not None.
+#   differential: the DIFF_* standards plus LVDS, LVDS_25, RSDS_25, MINI_LVDS_25,
+#     PPDS_25, TMDS_33 and BLVDS_25, which UG471 chapter 1 describes as differential
+#     standards (sections "LVDS and LVDS_25" through "BLVDS (Bus LVDS)", pp. 91-96).
+# Every standard in Table 1-55 is listed, in alphabetical order.
+#
+# Input-only use at other VCCO levels (UG471 Table 1-55):
+# - The "VCCO Input" column is "Any" for the VREF-based standards (HSTL, SSTL,
+#   HSUL_12, HSLVDCI) and for the non-DCI DIFF_HSTL, DIFF_SSTL and DIFF_HSUL_12
+#   standards and TMDS_33, so inputs of those standards can sit in a bank at any VCCO.
+# - Note 1: differential inputs of BLVDS_25, LVDS, LVDS_25, MINI_LVDS_25, PPDS_25
+#   and RSDS_25 can be placed in banks whose VCCO differs from the output level
+#   below, provided the internal termination is not used (DIFF_TERM = FALSE, the
+#   default) unless VCCO is at the output level, and the input signals meet the
+#   data sheet VIN, VIDIFF and VICM requirements.
+# - Note 2 (LVDS_25, MINI_LVDS_25, PPDS_25 and RSDS_25 outputs): if VCCO exceeds
+#   2.85V the outputs are high-Z.
+# The `vcco` values below are the output requirement only.
+#
+# TODO: LVPECL_25 is not listed in UG471 v1.10 Tables 1-55/1-56 (the document does not
+# mention LVPECL at all), so it is left out until a primary AMD source for it is found.
+
+id = "xilinx-7series"
+name = "AMD 7 series"
+constraint_format = "xdc"
+sources = [
+  { url = "https://docs.amd.com/v/u/en-US/ug471_7Series_SelectIO", covers = "IO standards: UG471 v1.10 (May 8, 2018), Tables 1-55 and 1-56" },
+]
+
+io_standards = [
+  { name = "BLVDS_25", vcco = 2.5, bank_types = ["HR"], differential = true, vref = false, dci = false },
+  { name = "DIFF_HSTL_I", vcco = 1.5, bank_types = ["HR", "HP"], differential = true, vref = false, dci = false },
+  { name = "DIFF_HSTL_II", vcco = 1.5, bank_types = ["HR", "HP"], differential = true, vref = false, dci = false },
+  { name = "DIFF_HSTL_II_18", vcco = 1.8, bank_types = ["HR", "HP"], differential = true, vref = false, dci = false },
+  { name = "DIFF_HSTL_II_DCI", vcco = 1.5, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "DIFF_HSTL_II_DCI_18", vcco = 1.8, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "DIFF_HSTL_II_T_DCI", vcco = 1.5, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "DIFF_HSTL_II_T_DCI_18", vcco = 1.8, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "DIFF_HSTL_I_18", vcco = 1.8, bank_types = ["HR", "HP"], differential = true, vref = false, dci = false },
+  { name = "DIFF_HSTL_I_DCI", vcco = 1.5, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "DIFF_HSTL_I_DCI_18", vcco = 1.8, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "DIFF_HSUL_12", vcco = 1.2, bank_types = ["HR", "HP"], differential = true, vref = false, dci = false },
+  { name = "DIFF_HSUL_12_DCI", vcco = 1.2, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "DIFF_MOBILE_DDR", vcco = 1.8, bank_types = ["HR"], differential = true, vref = false, dci = false },
+  { name = "DIFF_SSTL12", vcco = 1.2, bank_types = ["HP"], differential = true, vref = false, dci = false },
+  { name = "DIFF_SSTL12_DCI", vcco = 1.2, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "DIFF_SSTL12_T_DCI", vcco = 1.2, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "DIFF_SSTL135", vcco = 1.35, bank_types = ["HR", "HP"], differential = true, vref = false, dci = false },
+  { name = "DIFF_SSTL135_DCI", vcco = 1.35, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "DIFF_SSTL135_R", vcco = 1.35, bank_types = ["HR"], differential = true, vref = false, dci = false },
+  { name = "DIFF_SSTL135_T_DCI", vcco = 1.35, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "DIFF_SSTL15", vcco = 1.5, bank_types = ["HR", "HP"], differential = true, vref = false, dci = false },
+  { name = "DIFF_SSTL15_DCI", vcco = 1.5, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "DIFF_SSTL15_R", vcco = 1.5, bank_types = ["HR"], differential = true, vref = false, dci = false },
+  { name = "DIFF_SSTL15_T_DCI", vcco = 1.5, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "DIFF_SSTL18_I", vcco = 1.8, bank_types = ["HR", "HP"], differential = true, vref = false, dci = false },
+  { name = "DIFF_SSTL18_II", vcco = 1.8, bank_types = ["HR", "HP"], differential = true, vref = false, dci = false },
+  { name = "DIFF_SSTL18_II_DCI", vcco = 1.8, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "DIFF_SSTL18_II_T_DCI", vcco = 1.8, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "DIFF_SSTL18_I_DCI", vcco = 1.8, bank_types = ["HP"], differential = true, vref = false, dci = true },
+  { name = "HSLVDCI_15", vcco = 1.5, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "HSLVDCI_18", vcco = 1.8, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "HSTL_I", vcco = 1.5, bank_types = ["HR", "HP"], differential = false, vref = true, dci = false },
+  { name = "HSTL_II", vcco = 1.5, bank_types = ["HR", "HP"], differential = false, vref = true, dci = false },
+  { name = "HSTL_II_18", vcco = 1.8, bank_types = ["HR", "HP"], differential = false, vref = true, dci = false },
+  { name = "HSTL_II_DCI", vcco = 1.5, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "HSTL_II_DCI_18", vcco = 1.8, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "HSTL_II_T_DCI", vcco = 1.5, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "HSTL_II_T_DCI_18", vcco = 1.8, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "HSTL_I_12", vcco = 1.2, bank_types = ["HP"], differential = false, vref = true, dci = false },
+  { name = "HSTL_I_18", vcco = 1.8, bank_types = ["HR", "HP"], differential = false, vref = true, dci = false },
+  { name = "HSTL_I_DCI", vcco = 1.5, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "HSTL_I_DCI_18", vcco = 1.8, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "HSUL_12", vcco = 1.2, bank_types = ["HR", "HP"], differential = false, vref = true, dci = false },
+  { name = "HSUL_12_DCI", vcco = 1.2, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "LVCMOS12", vcco = 1.2, bank_types = ["HR", "HP"], differential = false, vref = false, dci = false },
+  { name = "LVCMOS15", vcco = 1.5, bank_types = ["HR", "HP"], differential = false, vref = false, dci = false },
+  { name = "LVCMOS18", vcco = 1.8, bank_types = ["HR", "HP"], differential = false, vref = false, dci = false },
+  { name = "LVCMOS25", vcco = 2.5, bank_types = ["HR"], differential = false, vref = false, dci = false },
+  { name = "LVCMOS33", vcco = 3.3, bank_types = ["HR"], differential = false, vref = false, dci = false },
+  { name = "LVDCI_15", vcco = 1.5, bank_types = ["HP"], differential = false, vref = false, dci = true },
+  { name = "LVDCI_18", vcco = 1.8, bank_types = ["HP"], differential = false, vref = false, dci = true },
+  { name = "LVDCI_DV2_15", vcco = 1.5, bank_types = ["HP"], differential = false, vref = false, dci = true },
+  { name = "LVDCI_DV2_18", vcco = 1.8, bank_types = ["HP"], differential = false, vref = false, dci = true },
+  { name = "LVDS", vcco = 1.8, bank_types = ["HP"], differential = true, vref = false, dci = false },
+  { name = "LVDS_25", vcco = 2.5, bank_types = ["HR"], differential = true, vref = false, dci = false },
+  { name = "LVTTL", vcco = 3.3, bank_types = ["HR"], differential = false, vref = false, dci = false },
+  { name = "MINI_LVDS_25", vcco = 2.5, bank_types = ["HR"], differential = true, vref = false, dci = false },
+  { name = "MOBILE_DDR", vcco = 1.8, bank_types = ["HR"], differential = false, vref = false, dci = false },
+  { name = "PCI33_3", vcco = 3.3, bank_types = ["HR"], differential = false, vref = false, dci = false },
+  { name = "PPDS_25", vcco = 2.5, bank_types = ["HR"], differential = true, vref = false, dci = false },
+  { name = "RSDS_25", vcco = 2.5, bank_types = ["HR"], differential = true, vref = false, dci = false },
+  { name = "SSTL12", vcco = 1.2, bank_types = ["HP"], differential = false, vref = true, dci = false },
+  { name = "SSTL12_DCI", vcco = 1.2, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "SSTL12_T_DCI", vcco = 1.2, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "SSTL135", vcco = 1.35, bank_types = ["HR", "HP"], differential = false, vref = true, dci = false },
+  { name = "SSTL135_DCI", vcco = 1.35, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "SSTL135_R", vcco = 1.35, bank_types = ["HR"], differential = false, vref = true, dci = false },
+  { name = "SSTL135_T_DCI", vcco = 1.35, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "SSTL15", vcco = 1.5, bank_types = ["HR", "HP"], differential = false, vref = true, dci = false },
+  { name = "SSTL15_DCI", vcco = 1.5, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "SSTL15_R", vcco = 1.5, bank_types = ["HR"], differential = false, vref = true, dci = false },
+  { name = "SSTL15_T_DCI", vcco = 1.5, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "SSTL18_I", vcco = 1.8, bank_types = ["HR", "HP"], differential = false, vref = true, dci = false },
+  { name = "SSTL18_II", vcco = 1.8, bank_types = ["HR", "HP"], differential = false, vref = true, dci = false },
+  { name = "SSTL18_II_DCI", vcco = 1.8, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "SSTL18_II_T_DCI", vcco = 1.8, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "SSTL18_I_DCI", vcco = 1.8, bank_types = ["HP"], differential = false, vref = true, dci = true },
+  { name = "TMDS_33", vcco = 3.3, bank_types = ["HR"], differential = true, vref = false, dci = false },
+]

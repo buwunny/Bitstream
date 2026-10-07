@@ -1,0 +1,17 @@
+# This project is broken on purpose: `bitstream check` must reject it.
+#
+# The Arty's high-speed Pmod JB is routed as differential pairs, so jb[0]/jb[1]
+# (E15/E16) are a true P/N pair. But they sit in bank 15, which the board powers
+# at 3.3 V, and LVDS_25 outputs need VCCO = 2.5 V.
+
+[project]
+name = "lvds_tx"
+top = "lvds_tx"
+board = "arty-a7-35"
+
+[sources]
+files = ["rtl/lvds_tx.v"]
+
+[pins]
+clk = { signal = "CLK100MHZ" }
+lvds_out = { signal = "jb[0]", signal_n = "jb[1]", io_standard = "LVDS_25" }

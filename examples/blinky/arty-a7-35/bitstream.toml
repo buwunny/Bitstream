@@ -1,0 +1,12 @@
+[project]
+name = "blinky"
+top = "blinky"
+board = "arty-a7-35"
+
+[sources]
+files = ["rtl/blinky.v"]
+
+[pins]
+clk = { signal = "CLK100MHZ" }                      # 100 MHz oscillator
+rst = { signal = "BTN0" }
+led = { signals = ["LD4", "LD5", "LD6", "LD7"] }    # the four green LEDs

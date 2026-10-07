@@ -1,0 +1,31 @@
+id = "ice40"
+name = "Lattice iCE40"
+constraint_format = "pcf"
+sources = [
+  { url = "https://www.latticesemi.com/view_document?document_id=51968", covers = "IO standards: iCE40 UltraPlus Family Data Sheet FPGA-DS-02008 v2.4 (February 2025), Tables 3.9 and 3.10" },
+]
+
+# Only iCE40 UltraPlus has been checked so far. iCE40 PCF files carry no IO
+# standard; it is implied by the bank VCCIO.
+#
+# TODO: the data sheet describes differential comparators on paired IO
+# (section 3.1.9, Table 4.14, characterised at VCCIO = 2.5 V) but does not name a
+# differential IO standard, so none is listed. The pinout file marks the pairs in
+# banks 0, 1 and 2.
+
+[[io_standards]]
+name = "LVCMOS33"
+vcco = 3.3
+
+[[io_standards]]
+name = "LVCMOS25"
+vcco = 2.5
+
+[[io_standards]]
+name = "LVCMOS18"
+vcco = 1.8
+
+# Output only: Table 3.10 lists it, Table 3.9 (inputs) does not.
+[[io_standards]]
+name = "LVCMOS12"
+vcco = 1.2
